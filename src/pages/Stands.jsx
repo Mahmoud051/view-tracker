@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/index'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { PageHeader, StatusBadge, EmptyState, LoadingScreen, FormField } from '@/components/ui/shared'
 
 const EMPTY_FORM = {
-  code: '', address: '', width: '', height: '',
+  code: '', address: '', width: '', height: '', desc: '',
   gov_license_number: '', gov_rental_start: '', gov_rental_end: '', gov_rental_cost: '',
 }
 
@@ -86,6 +87,7 @@ export default function Stands() {
         photo_url,
         width: parseFloat(form.width),
         height: parseFloat(form.height),
+        desc: form.desc.trim() || null,
         gov_license_number: form.gov_license_number || null,
         gov_rental_start: form.gov_rental_start || null,
         gov_rental_end: form.gov_rental_end || null,
@@ -191,6 +193,9 @@ export default function Stands() {
                       {stand.width} × {stand.height} م = {(stand.width * stand.height).toFixed(1)} م²
                     </p>
                   )}
+                  {stand.desc && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{stand.desc}</p>
+                  )}
                 </div>
               </button>
             )
@@ -216,6 +221,9 @@ export default function Stands() {
             </FormField>
             <FormField label="الارتفاع (متر)" required error={formErrors.height}>
               <Input type="number" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} placeholder="0" />
+            </FormField>
+            <FormField label="الوصف" className="sm:col-span-2">
+              <Textarea value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })} placeholder="وصف اللوحة والموقع..." />
             </FormField>
             <FormField label="صورة اللوحة" className="sm:col-span-2">
               <Input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} />
