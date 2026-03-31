@@ -45,7 +45,7 @@ export default function StandDetail() {
       supabase.from('maintenance_records').select('*').eq('stand_id', id).order('date', { ascending: false }),
     ])
     setStand(s)
-    setInfoForm({ code: s?.code || '', address: s?.address || '', width: s?.width || '', height: s?.height || '' })
+    setInfoForm({ code: s?.code || '', address: s?.address || '', width: s?.width || '', height: s?.height || '', desc: s?.desc || '' })
     setGovForm({
       gov_license_number: s?.gov_license_number || '',
       gov_rental_start: s?.gov_rental_start || '',
@@ -85,6 +85,7 @@ export default function StandDetail() {
         address: infoForm.address,
         width: parseFloat(infoForm.width),
         height: parseFloat(infoForm.height),
+        desc: infoForm.desc?.trim() || null,
       }
       if (photoFile) {
         const fileName = `${Date.now()}-${photoFile.name}`
@@ -214,18 +215,27 @@ export default function StandDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="كود اللوحة"><Input value={infoForm.code} onChange={e => setInfoForm({...infoForm, code: e.target.value})} /></FormField>
                   <FormField label="العنوان" className="sm:col-span-2"><Input value={infoForm.address} onChange={e => setInfoForm({...infoForm, address: e.target.value})} /></FormField>
+                  <FormField label="الوصف" className="sm:col-span-2"><Textarea value={infoForm.desc} onChange={e => setInfoForm({...infoForm, desc: e.target.value})} placeholder="وصف اللوحة والموقع..." /></FormField>
                   <FormField label="العرض (م)"><Input type="number" value={infoForm.width} onChange={e => setInfoForm({...infoForm, width: e.target.value})} /></FormField>
                   <FormField label="الارتفاع (م)"><Input type="number" value={infoForm.height} onChange={e => setInfoForm({...infoForm, height: e.target.value})} /></FormField>
                   <FormField label="صورة جديدة" className="sm:col-span-2"><Input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} /></FormField>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {[['الكود', stand.code], ['العرض', `${stand.width} م`], ['الارتفاع', `${stand.height} م`], ['المساحة', `${safeNum(stand.width) * safeNum(stand.height)} م²`]].map(([k,v]) => (
-                    <div key={k}>
-                      <p className="text-xs text-muted-foreground">{k}</p>
-                      <p className="font-semibold text-foreground">{v}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {[['الكود', stand.code], ['العرض', `${stand.width} م`], ['الارتفاع', `${stand.height} م`], ['المساحة', `${safeNum(stand.width) * safeNum(stand.height)} م²`]].map(([k,v]) => (
+                      <div key={k}>
+                        <p className="text-xs text-muted-foreground">{k}</p>
+                        <p className="font-semibold text-foreground">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {stand.desc && (
+                    <div className="border-t border-border pt-4">
+                      <p className="text-sm text-muted-foreground mb-2">الوصف</p>
+                      <p className="text-foreground whitespace-pre-wrap">{stand.desc}</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </CardContent>
