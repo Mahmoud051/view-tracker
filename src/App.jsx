@@ -16,7 +16,7 @@ import Reports from '@/pages/Reports'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
       <ThemeProvider>
         <AuthProvider>
           <ToastProvider>

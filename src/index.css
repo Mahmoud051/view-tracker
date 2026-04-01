@@ -22,6 +22,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --info: 213 67% 52%;
+    --info-foreground: 0 0% 100%;
     --border: 214 32% 86%;
     --input: 214 32% 86%;
     --ring: 213 67% 24%;
@@ -48,6 +50,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --info: 213 60% 60%;
+    --info-foreground: 213 31% 91%;
     --border: 220 27% 20%;
     --input: 220 27% 20%;
     --ring: 213 60% 52%;
@@ -105,7 +109,7 @@
     @apply bg-destructive/15 text-destructive border-destructive/30;
   }
   .badge-upcoming {
-    @apply bg-blue-500/15 text-blue-500 border-blue-500/30;
+    @apply bg-info/15 text-info border-info/30;
   }
   .badge-terminated {
     @apply bg-muted text-muted-foreground border-border;
@@ -117,7 +121,10 @@
     @apply bg-success/15 text-success border-success/30;
   }
   .badge-rented {
-    @apply bg-blue-500/15 text-blue-500 border-blue-500/30;
+    @apply bg-info/15 text-info border-info/30;
+  }
+  .badge-inactive {
+    @apply bg-muted text-muted-foreground border-border;
   }
 
   /* Card hover effect */
@@ -172,5 +179,7 @@ input[type=number]::-webkit-outer-spin-button {
   margin: 0;
 }
 input[type=number] {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
+

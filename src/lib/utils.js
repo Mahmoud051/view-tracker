@@ -72,9 +72,17 @@ export const statusLabels = {
   renewal_pending: 'يحتاج تجديد',
   available: 'متاح',
   rented: 'مؤجر',
+  inactive: 'متوقف',
 }
 
 export const rentalTypeLabels = {
+  monthly: 'شهري',
+  quarterly: 'ربع سنوي',
+  semi_annual: 'نصف سنوي',
+  annual: 'سنوي',
+}
+
+export const paymentFrequencyLabels = {
   monthly: 'شهري',
   quarterly: 'ربع سنوي',
   semi_annual: 'نصف سنوي',
@@ -141,7 +149,27 @@ export function safeNum(val) {
   return isNaN(n) ? 0 : n
 }
 
-// Today as YYYY-MM-DD string
+// Convert Date to YYYY-MM-DD in local time (not UTC)
+export function toLocalDateStr(date) {
+  const d = new Date(date)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Add days to a YYYY-MM-DD date string, return YYYY-MM-DD string (local time)
+export function addDays(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const result = new Date(y, m - 1, d + days)
+  return toLocalDateStr(result)
+}
+
+// Today as YYYY-MM-DD string (local time, not UTC)
 export function todayStr() {
-  return format(new Date(), 'yyyy-MM-dd')
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, MapPin, Calendar } from 'lucide-react'
+import { Plus, Search, Building2, MapPin, Calendar, User, Ruler } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, computeGovStatus, todayStr } from '@/lib/utils'
+import { cn, formatDate, formatCurrency, computeGovStatus, computeContractStatus, todayStr } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/index'
@@ -13,7 +14,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { PageHeader, StatusBadge, EmptyState, LoadingScreen, FormField } from '@/components/ui/shared'
 
 const EMPTY_FORM = {
-  code: '', address: '', width: '', height: '', desc: '',
+  code: '', address: '', width: '', height: '', sides: '1', desc: '',
   gov_license_number: '', gov_rental_start: '', gov_rental_end: '', gov_rental_cost: '',
 }
 
@@ -23,6 +24,7 @@ export default function Stands() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [showInactive, setShowInactive] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
@@ -37,16 +39,17 @@ export default function Stands() {
     setLoading(true)
     const [{ data: s }, { data: c }] = await Promise.all([
       supabase.from('stands').select('*').order('created_at', { ascending: false }),
-      supabase.from('contracts').select('stand_id, status, start_date, end_date').eq('status', 'active'),
+      supabase.from('contracts').select('stand_id, status, start_date, end_date, total_value, duration_months, payment_frequency, clients(name, phone)').in('status', ['active', 'upcoming']),
     ])
     setStands(s || [])
     setContracts(c || [])
     setLoading(false)
   }
 
-  const rentedIds = new Set((contracts || []).map(c => c.stand_id))
+  const rentedIds = new Set((contracts || []).filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active').map(c => c.stand_id))
 
   const filtered = (stands || []).filter(s => {
+    if (s.is_active === false && !showInactive) return false
     const matchSearch = !search ||
       s.code?.toLowerCase().includes(search.toLowerCase()) ||
       s.address?.toLowerCase().includes(search.toLowerCase())
@@ -87,6 +90,7 @@ export default function Stands() {
         photo_url,
         width: parseFloat(form.width),
         height: parseFloat(form.height),
+        sides: parseInt(form.sides) || 1,
         desc: form.desc.trim() || null,
         gov_license_number: form.gov_license_number || null,
         gov_rental_start: form.gov_rental_start || null,
@@ -120,12 +124,12 @@ export default function Stands() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="بحث بالكود أو العنوان..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="ps-9"
+            className="pe-9"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -138,6 +142,14 @@ export default function Stands() {
             <SelectItem value="rented">مؤجر</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          size="sm"
+          variant={showInactive ? 'default' : 'outline'}
+          onClick={() => setShowInactive(v => !v)}
+          className="gap-1.5"
+        >
+          {showInactive ? 'إخفاء المتوقفة' : 'إظهار المتوقفة'}
+        </Button>
       </div>
 
       {/* Grid */}
@@ -151,8 +163,9 @@ export default function Stands() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map(stand => {
-            const isRented = rentedIds.has(stand.id)
+            const isRented = rentedIds.has(stand.id) || contracts.some(c => c.stand_id === stand.id && c.status === 'upcoming')
             const govSt = computeGovStatus(stand.gov_rental_end)
+            const isInactive = stand.is_active === false
             return (
               <button
                 key={stand.id}
@@ -168,33 +181,68 @@ export default function Stands() {
                       <Building2 className="w-10 h-10 text-muted-foreground/40" />
                     </div>
                   )}
-                  <div className="absolute top-2 start-2">
-                    <StatusBadge status={isRented ? 'rented' : 'available'} />
+                  <div className="absolute top-2 start-2 flex items-center gap-1">
+                    {!isInactive ? <StatusBadge status={isRented ? 'rented' : 'available'} /> : <span className="bg-muted text-muted-foreground border border-border text-xs px-2 py-0.5 rounded-full font-medium">متوقف</span>}
                   </div>
+                  {govSt !== 'active' && (
+                    <div className="absolute top-2 end-2">
+                      <StatusBadge status={govSt} className="text-xs" />
+                    </div>
+                  )}
                 </div>
                 {/* Info */}
-                <div className="p-4 space-y-2">
+                <div className={cn('p-4 space-y-2', isInactive && 'opacity-60')}>
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-bold text-foreground">{stand.code}</h3>
-                    {govSt !== 'active' && <StatusBadge status={govSt} className="text-xs" />}
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Ruler className="w-3 h-3" />
+                      {(stand.width * stand.height).toFixed(0)} م²
+                    </span>
                   </div>
                   <div className="flex items-start gap-1.5 text-muted-foreground">
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                     <p className="text-xs line-clamp-2">{stand.address}</p>
                   </div>
+                  {(() => {
+                    // Show active contract first, fall back to upcoming
+                    const contract = contracts.find(c => c.stand_id === stand.id && computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
+                      || contracts.find(c => c.stand_id === stand.id)
+                    if (!contract) {
+                      return (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <User className="w-3.5 h-3.5 flex-shrink-0" />
+                          <p className="text-xs text-muted-foreground">— غير مؤجرة</p>
+                        </div>
+                      )
+                    }
+                    const daysLeft = contract.end_date ? Math.ceil((new Date(contract.end_date) - new Date()) / 86400000) : null
+                    return (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                          <p className="text-xs font-medium text-primary">{contract.clients?.name || '—'}</p>
+                          {contract.status === 'upcoming' && <span className="text-xs bg-info/15 text-info px-1.5 py-0.5 rounded-full">قادم</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                          <p className="text-xs">ينتهي: {formatDate(contract.end_date)}</p>
+                          {daysLeft !== null && daysLeft > 0 && (
+                            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded-full', daysLeft <= 30 ? 'bg-destructive/15 text-destructive' : daysLeft <= 90 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success')}>
+                              {daysLeft} يوم
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
                   {stand.gov_rental_end && (
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                      <p className="text-xs">ترخيص حتى: {formatDate(stand.gov_rental_end)}</p>
+                      <p className="text-xs">
+                        ترخيص: {formatDate(stand.gov_rental_end)}
+                        {(() => { const gd = Math.ceil((new Date(stand.gov_rental_end) - new Date()) / 86400000); return gd > 0 && gd <= 90 ? ` (${gd} يوم)` : '' })()}
+                      </p>
                     </div>
-                  )}
-                  {(stand.width && stand.height) && (
-                    <p className="text-xs text-muted-foreground">
-                      {stand.width} × {stand.height} م = {(stand.width * stand.height).toFixed(1)} م²
-                    </p>
-                  )}
-                  {stand.desc && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{stand.desc}</p>
                   )}
                 </div>
               </button>
@@ -216,11 +264,20 @@ export default function Stands() {
             <FormField label="العنوان" required error={formErrors.address} className="sm:col-span-2">
               <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="العنوان الكامل للموقع" />
             </FormField>
-            <FormField label="العرض (متر)" required error={formErrors.width}>
+            <FormField label="الطول (متر)" required error={formErrors.width}>
               <Input type="number" value={form.width} onChange={e => setForm({ ...form, width: e.target.value })} placeholder="0" />
             </FormField>
-            <FormField label="الارتفاع (متر)" required error={formErrors.height}>
+            <FormField label="العرض (متر)" required error={formErrors.height}>
               <Input type="number" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} placeholder="0" />
+            </FormField>
+            <FormField label="عدد الأوجه">
+              <Select value={form.sides} onValueChange={v => setForm({ ...form, sides: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">وجه واحد</SelectItem>
+                  <SelectItem value="2">وجهين</SelectItem>
+                </SelectContent>
+              </Select>
             </FormField>
             <FormField label="الوصف" className="sm:col-span-2">
               <Textarea value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })} placeholder="وصف اللوحة والموقع..." />
@@ -238,10 +295,10 @@ export default function Stands() {
               <Input type="number" value={form.gov_rental_cost} onChange={e => setForm({ ...form, gov_rental_cost: e.target.value })} placeholder="0" />
             </FormField>
             <FormField label="تاريخ بداية الترخيص">
-              <Input type="date" value={form.gov_rental_start} onChange={e => setForm({ ...form, gov_rental_start: e.target.value })} />
+              <DateInput value={form.gov_rental_start} onChange={e => setForm({ ...form, gov_rental_start: e.target.value })} />
             </FormField>
             <FormField label="تاريخ انتهاء الترخيص">
-              <Input type="date" value={form.gov_rental_end} onChange={e => setForm({ ...form, gov_rental_end: e.target.value })} />
+              <DateInput value={form.gov_rental_end} onChange={e => setForm({ ...form, gov_rental_end: e.target.value })} />
             </FormField>
           </div>
           <DialogFooter>

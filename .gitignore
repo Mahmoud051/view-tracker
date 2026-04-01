@@ -1,1 +1,5 @@
 /node_modules
+.env
+CLAUDE.md
+/dist
+README.md

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Bell, Download, AlertTriangle, Calendar } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, daysRemaining, safeNum } from '@/lib/utils'
+import { formatDate, formatCurrency, daysRemaining, safeNum, toLocalDateStr, addDays } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/index'
 import { PageHeader, LoadingScreen } from '@/components/ui/shared'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,9 +16,9 @@ export default function ExpiryAlerts() {
   const [contractAlerts, setContractAlerts] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [govDate, setGovDate] = useState(new Date().toISOString().split('T')[0])
+  const [govDate, setGovDate] = useState(toLocalDateStr(new Date()))
   const [govDays, setGovDays] = useState(30)
-  const [contractDate, setContractDate] = useState(new Date().toISOString().split('T')[0])
+  const [contractDate, setContractDate] = useState(toLocalDateStr(new Date()))
   const [contractDays, setContractDays] = useState(30)
 
   useEffect(() => { fetchGovAlerts() }, [govDate, govDays])
@@ -30,7 +31,7 @@ export default function ExpiryAlerts() {
 
   async function fetchGovAlerts() {
     const from = govDate
-    const to = new Date(new Date(govDate).getTime() + govDays * 86400000).toISOString().split('T')[0]
+    const to = addDays(govDate, govDays)
     const { data } = await supabase
       .from('stands')
       .select('id, code, address, gov_license_number, gov_rental_end')
@@ -41,16 +42,18 @@ export default function ExpiryAlerts() {
   }
 
   async function fetchContractAlerts() {
-    const from = contractDate
-    const to = new Date(new Date(contractDate).getTime() + contractDays * 86400000).toISOString().split('T')[0]
+    const to = addDays(contractDate, contractDays)
     const { data } = await supabase
       .from('contracts')
-      .select('id, end_date, total_value, status, stands(code, address), clients(name, phone), payments(amount)')
-      .eq('status', 'active')
-      .gte('end_date', from)
+      .select('id, start_date, end_date, total_value, status, stands(code, address), clients(name, phone), payments(amount)')
+      .neq('status', 'terminated')
       .lte('end_date', to)
       .order('end_date')
-    setContractAlerts(data || [])
+    const filtered = (data || []).filter(c => {
+      const days = daysRemaining(c.end_date)
+      return days !== null && days >= 0 && days <= contractDays
+    })
+    setContractAlerts(filtered)
   }
 
   function exportGovExcel() {
@@ -77,7 +80,7 @@ export default function ExpiryAlerts() {
         'هاتف العميل': c.clients?.phone || '—',
         'تاريخ انتهاء العقد': formatDate(c.end_date),
         'الأيام المتبقية': daysRemaining(c.end_date) ?? '—',
-        'المبلغ المتبقي (جنيه)': safeNum(c.total_value) - paid,
+        'المبلغ': balance >= 0 ? `له: ${formatCurrency(balance)}` : `عليه: ${formatCurrency(Math.abs(balance))}`,
       }
     })
     const ws = XLSX.utils.json_to_sheet(rows)
@@ -117,7 +120,7 @@ export default function ExpiryAlerts() {
           <div className="flex flex-wrap gap-3 mt-2">
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground whitespace-nowrap">من تاريخ</label>
-              <Input type="date" value={govDate} onChange={e => setGovDate(e.target.value)} className="w-40 h-8 text-xs" />
+              <DateInput value={govDate} onChange={e => setGovDate(e.target.value)} className="w-40 h-8 text-xs" />
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground whitespace-nowrap">خلال</label>
@@ -182,7 +185,7 @@ export default function ExpiryAlerts() {
           <div className="flex flex-wrap gap-3 mt-2">
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground whitespace-nowrap">من تاريخ</label>
-              <Input type="date" value={contractDate} onChange={e => setContractDate(e.target.value)} className="w-40 h-8 text-xs" />
+              <DateInput value={contractDate} onChange={e => setContractDate(e.target.value)} className="w-40 h-8 text-xs" />
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground whitespace-nowrap">خلال</label>
@@ -207,14 +210,14 @@ export default function ExpiryAlerts() {
                     <TableHead>الهاتف</TableHead>
                     <TableHead>تاريخ الانتهاء</TableHead>
                     <TableHead>الأيام المتبقية</TableHead>
-                    <TableHead>المبلغ المتبقي</TableHead>
+                    <TableHead>له / عليه</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contractAlerts.map(c => {
                     const days = daysRemaining(c.end_date)
                     const paid = (c.payments || []).reduce((a, p) => a + safeNum(p.amount), 0)
-                    const rem = safeNum(c.total_value) - paid
+                    const balance = paid - safeNum(c.total_value)
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-semibold">{c.stands?.code}</TableCell>
@@ -222,7 +225,7 @@ export default function ExpiryAlerts() {
                         <TableCell>{c.clients?.phone || '—'}</TableCell>
                         <TableCell>{formatDate(c.end_date)}</TableCell>
                         <TableCell>{days !== null ? urgencyBadge(days) : '—'}</TableCell>
-                        <TableCell className={rem > 0 ? 'text-destructive font-medium' : 'text-success'}>{formatCurrency(rem)}</TableCell>
+                        <TableCell className={balance >= 0 ? 'text-success font-medium' : 'text-destructive font-medium'}>{formatCurrency(Math.abs(balance))} {balance >= 0 ? 'له' : 'عليه'}</TableCell>
                       </TableRow>
                     )
                   })}

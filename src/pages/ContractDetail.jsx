@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, rentalTypeLabels, paymentMethodLabels, contractSerial, computeContractStatus } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/index'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/index'
@@ -15,7 +16,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/index'
 
-const EMPTY_PAYMENT = { amount: '', payment_date: new Date().toISOString().split('T')[0], payment_method: 'cash', notes: '' }
+const INTERVAL_MONTHS = {
+  monthly: 1,
+  quarterly: 3,
+  semi_annual: 6,
+  annual: 12,
+}
+
+const INTERVAL_LABELS = {
+  monthly: 'شهري (كل شهر)',
+  quarterly: 'ربع سنوي (كل 3 أشهر)',
+  semi_annual: 'نصف سنوي (كل 6 أشهر)',
+  annual: 'سنوي (كل 12 شهر)',
+}
+
+const EMPTY_PAYMENT = { amount: '', payment_date: toLocalDateStr(new Date()), payment_method: 'cash', notes: '' }
 
 export default function ContractDetail() {
   const { id } = useParams()
@@ -27,25 +42,68 @@ export default function ContractDetail() {
   const [loading, setLoading] = useState(true)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [paymentForm, setPaymentForm] = useState(EMPTY_PAYMENT)
+  const [editingPayment, setEditingPayment] = useState(null)
   const [saving, setSaving] = useState(false)
   const [terminateConfirm, setTerminateConfirm] = useState(false)
+  const [deletePaymentConfirm, setDeletePaymentConfirm] = useState(null)
+  const [deleteContractConfirm, setDeleteContractConfirm] = useState(false)
+  const [editContractOpen, setEditContractOpen] = useState(false)
+  const [editContractForm, setEditContractForm] = useState({})
+  const [allStands, setAllStands] = useState([])
+  const [allClients, setAllClients] = useState([])
 
   useEffect(() => { fetchAll() }, [id])
 
   async function fetchAll() {
     setLoading(true)
-    const [{ data: c }, { data: p }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: s }, { data: cl }] = await Promise.all([
       supabase.from('contracts').select('*, stands(*), clients(*)').eq('id', id).single(),
       supabase.from('payments').select('*').eq('contract_id', id).order('payment_date', { ascending: false }),
+      supabase.from('stands').select('id, code, address, is_active').order('code'),
+      supabase.from('clients').select('id, name, phone').order('name'),
     ])
     setContract(c)
     setPayments(p || [])
+    setAllStands((s || []).filter(stand => stand.is_active !== false))
+    setAllClients(cl || [])
+    if (c) {
+      setEditContractForm({
+        stand_id: c.stand_id,
+        client_id: c.client_id,
+        start_date: c.start_date,
+        duration_months: c.duration_months || '',
+        end_date: c.end_date,
+        payment_frequency: c.payment_frequency,
+        monthly_rate: c.monthly_rate || '',
+        total_value: c.total_value,
+        price_per_period: c.price_per_period || '',
+        notes: c.notes || '',
+      })
+    }
     setLoading(false)
   }
 
   const totalPaid = payments.reduce((a, p) => a + safeNum(p.amount), 0)
-  const remaining = safeNum(contract?.total_value) - totalPaid
+  const balance = totalPaid - safeNum(contract?.total_value)
   const displayStatus = contract ? computeContractStatus(contract.start_date, contract.end_date, contract.status) : null
+
+  // Period-based amount due (how much should be paid by now based on payment cycle)
+  let periodDue = 0
+  if (contract && displayStatus === 'active' && contract.start_date && contract.payment_frequency) {
+    const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+    const now = new Date()
+    const start = new Date(contract.start_date)
+    const end = contract.end_date ? new Date(contract.end_date) : null
+    const nowCapped = end && now > end ? end : now
+    const monthlyRate = safeNum(contract.total_value) / (parseInt(contract.duration_months) || 1)
+    const intervalMonths = INTERVAL_MONTHS[contract.payment_frequency] || 1
+    const periodRate = monthlyRate * intervalMonths
+    const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+    const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+    const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
+    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    periodDue = Math.max(0, periodsDue * periodRate - totalPaid)
+  }
 
   async function addPayment() {
     if (!paymentForm.amount || isNaN(paymentForm.amount)) {
@@ -77,6 +135,118 @@ export default function ContractDetail() {
       setTerminateConfirm(false)
       fetchAll()
     }
+  }
+
+  function updateEndDate(startDate, durationMonths, monthlyRate, interval) {
+    if (!startDate || !durationMonths) { setEditContractForm(f => ({ ...f, end_date: '', total_value: '', price_per_period: '' })); return }
+    try {
+      const start = new Date(startDate)
+      start.setMonth(start.getMonth() + parseInt(durationMonths))
+      start.setDate(start.getDate() - 1)
+      const endStr = toLocalDateStr(start)
+      const months = parseInt(durationMonths)
+      const rate = parseFloat(monthlyRate) || 0
+      const total = months * rate
+      const intervalMonths = INTERVAL_MONTHS[interval] || 1
+      const perPeriod = rate * intervalMonths
+      setEditContractForm(f => ({ ...f, end_date: endStr, total_value: total > 0 ? total.toFixed(2) : '', price_per_period: perPeriod > 0 ? perPeriod.toFixed(2) : '' }))
+    } catch { setEditContractForm(f => ({ ...f, end_date: '', total_value: '', price_per_period: '' })) }
+  }
+
+  // Can start contract manually? Only upcoming contracts, and only if the stand has no active contract
+  // We fetch the stand's active contract to determine this
+  const [standActive, setStandActive] = useState(null)
+  useEffect(() => {
+    if (contract && contract.status === 'upcoming' && contract.stand_id) {
+      supabase.from('contracts').select('id').eq('stand_id', contract.stand_id).eq('status', 'active').limit(1).then(({ data }) => {
+        setStandActive(data && data.length > 0 ? data[0] : null)
+      })
+    } else {
+      setStandActive(null)
+    }
+  }, [contract])
+
+  const canStartManual = contract?.status === 'upcoming' && !standActive
+
+  async function startContractNow() {
+    const today = toLocalDateStr(new Date())
+    const { error } = await supabase.from('contracts').update({ status: 'active', start_date: today }).eq('id', id)
+    if (!error) {
+      toast({ title: 'تم تفعيل العقد', description: `يبدأ من ${today}`, variant: 'success' })
+      fetchAll()
+    } else {
+      toast({ title: 'خطأ', description: error.message, variant: 'error' })
+    }
+  }
+
+  function openEditPayment(p) {
+    setEditingPayment(p.id)
+    setPaymentForm({ amount: p.amount, payment_date: p.payment_date, payment_method: p.payment_method, notes: p.notes || '' })
+    setPaymentDialogOpen(true)
+  }
+
+  async function saveEditedPayment() {
+    if (!paymentForm.amount || isNaN(paymentForm.amount)) { toast({ title: 'خطأ', description: 'المبلغ مطلوب', variant: 'error' }); return }
+    setSaving(true)
+    const { error } = await supabase.from('payments').update({
+      amount: parseFloat(paymentForm.amount),
+      payment_date: paymentForm.payment_date,
+      payment_method: paymentForm.payment_method,
+      notes: paymentForm.notes || null,
+    }).eq('id', editingPayment)
+    if (!error) {
+      toast({ title: 'تم التحديث', variant: 'success' })
+      setPaymentDialogOpen(false)
+      setEditingPayment(null)
+      setPaymentForm(EMPTY_PAYMENT)
+      fetchAll()
+    } else {
+      toast({ title: 'خطأ', description: error.message, variant: 'error' })
+    }
+    setSaving(false)
+  }
+
+  async function deletePayment(pId) {
+    await supabase.from('payments').delete().eq('id', pId)
+    toast({ title: 'تم حذف الدفعة', variant: 'success' })
+    setDeletePaymentConfirm(null)
+    fetchAll()
+  }
+
+  async function saveEditedContract() {
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('contracts').update({
+        stand_id: editContractForm.stand_id,
+        client_id: editContractForm.client_id,
+        start_date: editContractForm.start_date,
+        end_date: editContractForm.end_date,
+        duration_months: parseInt(editContractForm.duration_months) || null,
+        payment_frequency: editContractForm.payment_frequency,
+        monthly_rate: parseFloat(editContractForm.monthly_rate) || 0,
+        price_per_period: parseFloat(editContractForm.price_per_period) || 0,
+        total_value: parseFloat(editContractForm.total_value) || 0,
+        notes: editContractForm.notes || null,
+      }).eq('id', id)
+      if (error) throw error
+      toast({ title: 'تم تحديث العقد', variant: 'success' })
+      setEditContractOpen(false)
+      fetchAll()
+    } catch (e) { toast({ title: 'خطأ', description: e.message, variant: 'error' }) }
+    setSaving(false)
+  }
+
+  async function deleteContract() {
+    // Delete all payments first
+    await supabase.from('payments').delete().eq('contract_id', id)
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (!error) {
+      toast({ title: 'تم حذف العقد والمدفوعات', variant: 'success' })
+      navigate('/contracts')
+    } else {
+      toast({ title: 'خطأ', description: error.message, variant: 'error' })
+    }
+    setDeleteContractConfirm(false)
   }
 
   function printContract() {
@@ -128,6 +298,8 @@ export default function ContractDetail() {
       <div class="field"><div class="label">الكود</div><div class="value">${contract.stands?.code || '—'}</div></div>
       <div class="field"><div class="label">العنوان</div><div class="value">${contract.stands?.address || '—'}</div></div>
       <div class="field"><div class="label">المساحة</div><div class="value">${safeNum(contract.stands?.width) * safeNum(contract.stands?.height)} م²</div></div>
+      <div class="field"><div class="label">الأبعاد</div><div class="value">${contract.stands?.width} م × ${contract.stands?.height} م</div></div>
+      <div class="field"><div class="label">عدد الأوجه</div><div class="value">${contract.stands?.sides == 2 ? 'وجهين' : 'وجه واحد'}</div></div>
     </div>
     <div>
       <h2>بيانات العميل</h2>
@@ -138,12 +310,13 @@ export default function ContractDetail() {
 
   <h2>تفاصيل العقد</h2>
   <div class="grid">
-    <div class="field"><div class="label">نوع الإيجار</div><div class="value">${rentalTypeLabels[contract.rental_type] || contract.rental_type}</div></div>
+    <div class="field"><div class="label">مدة العقد</div><div class="value">${contract.duration_months || '—'} شهر</div></div>
+    <div class="field"><div class="label">نظام الدفع</div><div class="value">${paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency}</div></div>
     <div class="field"><div class="label">تاريخ البداية</div><div class="value">${formatDate(contract.start_date)}</div></div>
     <div class="field"><div class="label">قيمة العقد الإجمالية</div><div class="value">${formatCurrency(contract.total_value)}</div></div>
     <div class="field"><div class="label">تاريخ النهاية</div><div class="value">${formatDate(contract.end_date)}</div></div>
     <div class="field"><div class="label">المبلغ المدفوع</div><div class="value">${formatCurrency(totalPaid)}</div></div>
-    <div class="field"><div class="label">المبلغ المتبقي</div><div class="value" style="color:${remaining > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(remaining)}</div></div>
+    <div class="field"><div class="label">${balance >= 0 ? 'له / رصيد مدفوع' : 'عليه / مستحق'}</div><div class="value" style="color:${balance >= 0 ? '#16a34a' : '#dc2626'}">${formatCurrency(Math.abs(balance))}</div></div>
   </div>
   ${contract.notes ? `<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;font-size:13px;"><b>ملاحظات:</b> ${contract.notes}</div>` : ''}
 
@@ -153,7 +326,7 @@ export default function ContractDetail() {
     <thead><tr><th>#</th><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th><th>ملاحظات</th></tr></thead>
     <tbody>
       ${payments.map((p, i) => `<tr><td>${i + 1}</td><td>${formatDate(p.payment_date)}</td><td>${formatCurrency(p.amount)}</td><td>${paymentMethodLabels[p.payment_method] || p.payment_method}</td><td>${p.notes || '—'}</td></tr>`).join('')}
-      <tr class="total-row"><td colspan="2">الإجمالي</td><td>${formatCurrency(totalPaid)}</td><td colspan="2">متبقي: ${formatCurrency(remaining)}</td></tr>
+      <tr class="total-row"><td colspan="2">الإجمالي</td><td>${formatCurrency(totalPaid)}</td><td colspan="2">${balance >= 0 ? 'له:' : 'عليه:'} ${formatCurrency(Math.abs(balance))}</td></tr>
     </tbody>
   </table>` : '<p style="color:#94a3b8;font-size:13px;">لا توجد مدفوعات مسجلة</p>'}
 
@@ -179,7 +352,7 @@ export default function ContractDetail() {
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate('/contracts')}>
-          <ArrowRight className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
@@ -191,11 +364,24 @@ export default function ContractDetail() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {displayStatus === 'upcoming' && (
+            <Button size="sm" onClick={startContractNow} disabled={!canStartManual} className="bg-primary hover:bg-primary/90">
+              <PlayCircle className="w-4 h-4" /> تفعيل العقد الآن {!canStartManual && '(العقد السابق نشط)'}
+            </Button>
+          )}
           {displayStatus !== 'terminated' && (
+            <Button variant="outline" size="sm" onClick={() => setEditContractOpen(true)}>
+              <Pencil className="w-4 h-4" /> تعديل
+            </Button>
+          )}
+          {displayStatus === 'active' && (
             <Button variant="outline" size="sm" onClick={() => setTerminateConfirm(true)} className="text-destructive border-destructive/40 hover:bg-destructive/10">
               <XCircle className="w-4 h-4" /> إنهاء العقد
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setDeleteContractConfirm(true)} className="text-destructive border-destructive/40 hover:bg-destructive/10">
+            <Trash2 className="w-4 h-4" /> حذف العقد
+          </Button>
           <Button variant="outline" size="sm" onClick={printContract}>
             <FileDown className="w-4 h-4" /> طباعة / PDF
           </Button>
@@ -203,10 +389,21 @@ export default function ContractDetail() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="قيمة العقد" value={formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
         <StatCard title="المدفوع" value={formatCurrency(totalPaid)} icon={CheckCircle} variant="success" />
-        <StatCard title="المتبقي" value={formatCurrency(remaining)} icon={CreditCard} variant={remaining > 0 ? 'danger' : 'success'} />
+        <StatCard
+          title="مستحق الآن"
+          value={formatCurrency(periodDue)}
+          icon={CreditCard}
+          variant={periodDue > 0 ? 'danger' : 'success'}
+        />
+        <StatCard
+          title="مدة العقد"
+          value={`${contract.duration_months || '—'} شهر`}
+          icon={CreditCard}
+          variant="info"
+        />
       </div>
 
       {/* Contract Details */}
@@ -219,7 +416,10 @@ export default function ContractDetail() {
               ['العنوان', contract.stands?.address],
               ['العميل', contract.clients?.name],
               ['الهاتف', contract.clients?.phone],
-              ['نوع الإيجار', rentalTypeLabels[contract.rental_type]],
+              ['مدة العقد', `${contract.duration_months || '—'} شهر`],
+              ['فترة الدفع', INTERVAL_LABELS[contract.payment_frequency]?.split('(')[0].trim() || paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency],
+              ['السعر الشهري', contract.monthly_rate ? formatCurrency(contract.monthly_rate) : '—'],
+              ['قيمة الدفعة', contract.price_per_period ? formatCurrency(contract.price_per_period) : '—'],
               ['تاريخ البداية', formatDate(contract.start_date)],
               ['تاريخ النهاية', formatDate(contract.end_date)],
             ].map(([k, v]) => (
@@ -267,6 +467,7 @@ export default function ContractDetail() {
                     <TableHead>المبلغ</TableHead>
                     <TableHead>طريقة الدفع</TableHead>
                     <TableHead>ملاحظات</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -279,6 +480,16 @@ export default function ContractDetail() {
                         <Badge variant="secondary">{paymentMethodLabels[p.payment_method]}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{p.notes || '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 justify-end">
+                          <Button size="icon-sm" variant="ghost" onClick={() => openEditPayment(p)} title="تعديل">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon-sm" variant="ghost" onClick={() => setDeletePaymentConfirm(p.id)} className="text-destructive hover:text-destructive" title="حذف">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -289,24 +500,23 @@ export default function ContractDetail() {
                 <span className="font-bold text-success text-base">{formatCurrency(totalPaid)}</span>
               </div>
               <div className="flex items-center justify-between text-sm mt-2">
-                <span className="text-muted-foreground">المتبقي:</span>
-                <span className={`font-bold text-base ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>{formatCurrency(remaining)}</span>
+                <span className="text-muted-foreground">{balance >= 0 ? 'له / رصيد مدفوع:' : 'عليه / مستحق:'}</span>
+                <span className={`font-bold text-base ${balance >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(Math.abs(balance))}</span>
               </div>
-            </>
-          )}
+            </>          )}
         </CardContent>
       </Card>
 
-      {/* Add Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      {/* Add/Edit Payment Dialog */}
+      <Dialog open={paymentDialogOpen} onOpenChange={v => { setPaymentDialogOpen(v); if (!v) { setEditingPayment(null); setPaymentForm(EMPTY_PAYMENT) } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>إضافة دفعة جديدة</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingPayment ? 'تعديل الدفعة' : 'إضافة دفعة جديدة'}</DialogTitle></DialogHeader>
           <div className="p-6 space-y-4">
             <FormField label="المبلغ (جنيه)" required>
               <Input type="number" value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: e.target.value})} placeholder="0" />
             </FormField>
             <FormField label="تاريخ الدفع">
-              <Input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm({...paymentForm, payment_date: e.target.value})} />
+              <DateInput value={paymentForm.payment_date} onChange={e => setPaymentForm({...paymentForm, payment_date: e.target.value})} />
             </FormField>
             <FormField label="طريقة الدفع">
               <Select value={paymentForm.payment_method} onValueChange={v => setPaymentForm({...paymentForm, payment_method: v})}>
@@ -323,8 +533,8 @@ export default function ContractDetail() {
             </FormField>
           </div>
           <DialogFooter>
-            <Button onClick={addPayment} disabled={saving}>{saving ? 'حفظ...' : 'إضافة الدفعة'}</Button>
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={editingPayment ? saveEditedPayment : addPayment} disabled={saving}>{saving ? 'حفظ...' : (editingPayment ? 'تحديث الدفعة' : 'إضافة الدفعة')}</Button>
+            <Button variant="outline" onClick={() => { setPaymentDialogOpen(false); setEditingPayment(null); setPaymentForm(EMPTY_PAYMENT) }}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -337,6 +547,84 @@ export default function ContractDetail() {
         confirmText="إنهاء العقد"
         onConfirm={terminateContract}
       />
+
+      <ConfirmDialog
+        open={deletePaymentConfirm !== null}
+        onOpenChange={() => setDeletePaymentConfirm(null)}
+        title="حذف الدفعة"
+        description="هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء."
+        confirmText="حذف الدفعة"
+        onConfirm={() => deletePayment(deletePaymentConfirm)}
+      />
+
+      <ConfirmDialog
+        open={deleteContractConfirm}
+        onOpenChange={setDeleteContractConfirm}
+        title="حذف العقد نهائياً"
+        description="هل أنت متأكد من حذف هذا العقد وجميع مدفوعاته؟ لا يمكن التراجع عن هذا الإجراء."
+        confirmText="حذف العقد"
+        onConfirm={deleteContract}
+      />
+
+      {/* Edit Contract Dialog */}
+      <Dialog open={editContractOpen} onOpenChange={setEditContractOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>تعديل العقد</DialogTitle></DialogHeader>
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+            <FormField label="اللوحة الإعلانية">
+              <Select value={editContractForm.stand_id} onValueChange={v => setEditContractForm({...editContractForm, stand_id: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {allStands.map(s => <SelectItem key={s.id} value={s.id}>{s.code} — {s.address?.slice(0,30)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="العميل">
+              <Select value={editContractForm.client_id} onValueChange={v => setEditContractForm({...editContractForm, client_id: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {allClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="تاريخ البداية">
+              <DateInput value={editContractForm.start_date} onChange={e => { setEditContractForm({...editContractForm, start_date: e.target.value}); updateEndDate(e.target.value, editContractForm.duration_months, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
+            </FormField>
+            <FormField label="مدة العقد (أشهر)">
+              <Input type="number" value={editContractForm.duration_months} min="1" onChange={e => { setEditContractForm({...editContractForm, duration_months: e.target.value}); updateEndDate(editContractForm.start_date, e.target.value, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
+            </FormField>
+            <FormField label="تاريخ النهاية">
+              <DateInput value={editContractForm.end_date} readOnly className="bg-muted cursor-not-allowed" />
+            </FormField>
+            <FormField label="فترة الدفع">
+              <Select value={editContractForm.payment_frequency} onValueChange={v => { setEditContractForm({...editContractForm, payment_frequency: v}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, editContractForm.monthly_rate, v) }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(INTERVAL_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="السعر الشهري (جنيه)">
+              <Input type="number" value={editContractForm.monthly_rate} onChange={e => { setEditContractForm({...editContractForm, monthly_rate: e.target.value}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, e.target.value, editContractForm.payment_frequency) }} />
+            </FormField>
+            <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[editContractForm.payment_frequency]?.split('(')[0].trim() || '—'})`}>
+              <Input type="number" value={editContractForm.price_per_period} readOnly className="bg-muted cursor-not-allowed font-bold text-success" />
+            </FormField>
+            <FormField label="القيمة الإجمالية">
+              <Input type="number" value={editContractForm.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
+            </FormField>
+            <FormField label="ملاحظات" className="sm:col-span-2">
+              <Textarea value={editContractForm.notes} onChange={e => setEditContractForm({...editContractForm, notes: e.target.value})} rows={3} />
+            </FormField>
+          </div>
+          <DialogFooter>
+            <Button onClick={saveEditedContract} disabled={saving}>{saving ? 'حفظ...' : 'تحديث العقد'}</Button>
+            <Button variant="outline" onClick={() => setEditContractOpen(false)}>إلغاء</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

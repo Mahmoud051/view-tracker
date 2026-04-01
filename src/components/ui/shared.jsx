@@ -25,12 +25,12 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmT
             {description}
           </AlertDialogPrimitive.Description>
           <div className="flex gap-3 justify-start">
-            <AlertDialogPrimitive.Action asChild>
-              <Button variant={variant} onClick={onConfirm}>{confirmText}</Button>
-            </AlertDialogPrimitive.Action>
             <AlertDialogPrimitive.Cancel asChild>
               <Button variant="outline">{cancelText}</Button>
             </AlertDialogPrimitive.Cancel>
+            <AlertDialogPrimitive.Action asChild>
+              <Button variant={variant} onClick={onConfirm}>{confirmText}</Button>
+            </AlertDialogPrimitive.Action>
           </div>
         </AlertDialogPrimitive.Content>
       </AlertDialogPrimitive.Portal>
@@ -47,6 +47,7 @@ const statusVariantMap = {
   renewal_pending: 'warning',
   available: 'success',
   rented: 'info',
+  inactive: 'muted',
 }
 
 export function StatusBadge({ status, className }) {
@@ -123,14 +124,14 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
     success: 'from-success/10 to-success/5 border-success/20',
     warning: 'from-warning/10 to-warning/5 border-warning/20',
     danger: 'from-destructive/10 to-destructive/5 border-destructive/20',
-    info: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+    info: 'from-info/10 to-info/5 border-info/20',
   }
   const iconVariants = {
     default: 'bg-primary/20 text-primary',
     success: 'bg-success/20 text-success',
     warning: 'bg-warning/20 text-warning',
     danger: 'bg-destructive/20 text-destructive',
-    info: 'bg-blue-500/20 text-blue-500',
+    info: 'bg-info/20 text-info',
   }
   return (
     <div className={cn(

@@ -31,15 +31,18 @@ function Layout() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex flex-shrink-0">
-        <Sidebar open={true} onClose={() => {}} />
-      </div>
-
-      {/* Mobile Sidebar */}
-      <div className="lg:hidden">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      </div>
+      {/* Sidebar — always rendered, responsive */}
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        className="hidden xl:flex"
+      />
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm xl:hidden pointer-events-auto"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -4,6 +4,9 @@ import * as TabsPrimitive from '@radix-ui/react-tabs'
 import * as SeparatorPrimitive from '@radix-ui/react-separator'
 import { cn } from '@/lib/utils'
 
+// ---- DateInput ----
+export { DateInput } from './date-input'
+
 // ---- Textarea ----
 export const Textarea = forwardRef(({ className, ...props }, ref) => (
   <textarea
@@ -152,7 +155,7 @@ export function Alert({ className, variant = 'default', children, ...props }) {
     destructive: 'border-destructive/30 bg-destructive/10 text-destructive',
     warning: 'border-warning/30 bg-warning/10 text-warning',
     success: 'border-success/30 bg-success/10 text-success',
-    info: 'border-blue-500/30 bg-blue-500/10 text-blue-500',
+    info: 'border-info/30 bg-info/10 text-info',
   }
   return (
     <div

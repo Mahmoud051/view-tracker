@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, FileText, UserPlus } from 'lucide-react'
+import { Plus, Search, FileText, UserPlus, X, ChevronDown, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, calculateEndDate, rentalTypeLabels, safeNum, todayStr } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/index'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/index'
@@ -13,11 +14,177 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { PageHeader, StatusBadge, EmptyState, LoadingScreen, FormField } from '@/components/ui/shared'
 import { Badge } from '@/components/ui/badge'
 
+// payment interval = how many months between each payment
+// monthly: 1, quarterly: 3, semi_annual: 6, annual: 12
+const INTERVAL_MONTHS = {
+  monthly: 1,
+  quarterly: 3,
+  semi_annual: 6,
+  annual: 12,
+}
+
+const INTERVAL_LABELS = {
+  monthly: 'شهري (كل شهر)',
+  quarterly: 'ربع سنوي (كل 3 أشهر)',
+  semi_annual: 'نصف سنوي (كل 6 أشهر)',
+  annual: 'سنوي (كل 12 شهر)',
+}
+
 const EMPTY_FORM = {
-  stand_id: '', client_id: '', rental_type: 'monthly',
-  start_date: todayStr(), end_date: '', total_value: '', notes: '', status: 'active',
+  stand_id: '', client_id: '', start_date: todayStr(), end_date: '',
+  duration_months: '', monthly_rate: '',
+  payment_interval: 'monthly',
+  total_value: '', price_per_period: '',
+  notes: '', status: 'active', previous_end_date: null,
 }
 const EMPTY_CLIENT = { name: '', phone: '' }
+
+// ---- Searchable Select for Stand ----
+function StandSearchSelect({ stands, value, onChange, error }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+  const selected = stands.find(s => s.id === value)
+
+  const filtered = (stands || []).filter(s =>
+    !search ||
+    s.code?.toLowerCase().includes(search.toLowerCase()) ||
+    s.address?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`w-full flex items-center justify-between h-10 px-3 rounded-lg border bg-background text-sm transition-colors ${error ? 'border-destructive' : 'border-input'} hover:border-primary/50`}
+      >
+        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+          {selected ? <span className="font-medium">{selected.code}</span> : 'اختر اللوحة'}
+          {selected && <span className="text-muted-foreground ms-2 text-xs">— {selected.address?.slice(0, 25)}</span>}
+        </span>
+        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+          <div className="relative p-2 border-b border-border">
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ابحث بالكود أو العنوان..."
+              className="w-full h-8 px-3 py-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-4">لا توجد لوحات</p>
+            ) : filtered.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => { onChange(s.id); setOpen(false); setSearch('') }}
+                className={`w-full text-start px-3 py-2.5 text-sm hover:bg-muted transition-colors ${value === s.id ? 'bg-primary/10' : ''}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="font-semibold text-foreground">{s.code}</span>
+                    <span className="text-muted-foreground ms-2 text-xs">{s.address?.slice(0, 30)}</span>
+                  </div>
+                  {s.is_active === false && <Badge className="bg-muted text-muted-foreground text-xs">متوقف</Badge>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  )
+}
+
+// ---- Searchable Select for Client ----
+function ClientSearchSelect({ clients, value, onChange, onAddNew }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+  const selected = clients.find(c => c.id === value)
+
+  const filtered = (clients || []).filter(c =>
+    !search ||
+    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className="flex-1 flex items-center justify-between h-10 px-3 rounded-lg border border-input bg-background text-sm hover:border-primary/50 transition-colors"
+        >
+          <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+            {selected ? <span className="font-medium">{selected.name}</span> : 'اختر العميل'}
+            {selected && <span className="text-muted-foreground ms-2 text-xs" dir="ltr">{selected.phone}</span>}
+          </span>
+          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        </button>
+        <Button size="icon" variant="outline" onClick={() => { onAddNew(); setOpen(false) }} title="إضافة عميل جديد">
+          <UserPlus className="w-4 h-4" />
+        </Button>
+      </div>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+          <div className="relative p-2 border-b border-border">
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ابحث بالاسم أو الهاتف..."
+              className="w-full h-8 px-3 py-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-4">لا توجد عملاء</p>
+            ) : filtered.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => { onChange(c.id); setOpen(false); setSearch('') }}
+                className={`w-full text-start px-3 py-2.5 text-sm hover:bg-muted transition-colors ${value === c.id ? 'bg-primary/10' : ''}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-foreground">{c.name}</span>
+                  <span className="text-muted-foreground text-xs" dir="ltr">{c.phone}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Contracts() {
   const [contracts, setContracts] = useState([])
@@ -47,17 +214,34 @@ export default function Contracts() {
     setLoading(true)
     const [{ data: c }, { data: s }, { data: cl }, { data: p }] = await Promise.all([
       supabase.from('contracts').select('*, stands(code, address), clients(name, phone)').order('created_at', { ascending: false }),
-      supabase.from('stands').select('id, code, address').order('code'),
+      supabase.from('stands').select('id, code, address, is_active').order('code'),
       supabase.from('clients').select('id, name, phone').order('name'),
       supabase.from('payments').select('contract_id, amount'),
     ])
     setContracts(c || [])
-    setStands(s || [])
+    // Filter out inactive stands from the dropdown
+    setStands((s || []).filter(stand => stand.is_active !== false))
     setClients(cl || [])
     const pm = {}
     ;(p || []).forEach(pay => { pm[pay.contract_id] = (pm[pay.contract_id] || 0) + safeNum(pay.amount) })
     setPaymentsMap(pm)
     setLoading(false)
+  }
+
+  async function onStandChange(standId) {
+    let prevEndDate = null
+    if (standId) {
+      const { data: prev } = await supabase
+        .from('contracts')
+        .select('end_date, status')
+        .eq('stand_id', standId)
+        .neq('status', 'terminated')
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .single()
+      if (prev) prevEndDate = prev.end_date
+    }
+    setForm(f => ({ ...f, stand_id: standId, start_date: todayStr(), previous_end_date: prevEndDate }))
   }
 
   const filtered = (contracts || []).filter(c => {
@@ -68,9 +252,44 @@ export default function Contracts() {
     return matchStatus && matchSearch
   })
 
-  function updateEndDate(startDate, rentalType) {
-    const end = calculateEndDate(startDate, rentalType)
-    setForm(f => ({ ...f, end_date: end }))
+  function computeValues(startDate, durationMonths, monthlyRate, interval) {
+    if (!startDate || !durationMonths) {
+      return { end_date: '', total_value: '', price_per_period: '' }
+    }
+    try {
+      const start = new Date(startDate)
+      start.setMonth(start.getMonth() + parseInt(durationMonths))
+      start.setDate(start.getDate() - 1)
+      const endStr = toLocalDateStr(start)
+      const months = parseInt(durationMonths)
+      const rate = parseFloat(monthlyRate) || 0
+      const total = months * rate
+      const intervalMonths = INTERVAL_MONTHS[interval] || 1
+      const perPeriod = rate * intervalMonths
+      return {
+        end_date: endStr,
+        total_value: total > 0 ? total.toFixed(2) : '',
+        price_per_period: perPeriod > 0 ? perPeriod.toFixed(2) : '',
+      }
+    } catch {
+      return { end_date: '', total_value: '', price_per_period: '' }
+    }
+  }
+
+  function onFormChange(field, value) {
+    const updated = { ...form, [field]: value }
+    if (field === 'start_date' || field === 'duration_months' || field === 'monthly_rate' || field === 'payment_interval') {
+      const computed = computeValues(
+        field === 'start_date' ? value : updated.start_date,
+        field === 'duration_months' ? value : updated.duration_months,
+        field === 'monthly_rate' ? value : updated.monthly_rate,
+        field === 'payment_interval' ? value : updated.payment_interval,
+      )
+      updated.end_date = computed.end_date
+      updated.total_value = computed.total_value
+      updated.price_per_period = computed.price_per_period
+    }
+    setForm(updated)
   }
 
   function validateForm() {
@@ -78,8 +297,11 @@ export default function Contracts() {
     if (!form.stand_id) errs.stand_id = 'اختر اللوحة'
     if (!form.client_id) errs.client_id = 'اختر العميل'
     if (!form.start_date) errs.start_date = 'تاريخ البداية مطلوب'
-    if (!form.end_date) errs.end_date = 'تاريخ النهاية مطلوب'
-    if (!form.total_value || isNaN(form.total_value)) errs.total_value = 'قيمة العقد مطلوبة'
+    if (form.previous_end_date && form.start_date < form.previous_end_date) {
+      errs.start_date = `يجب أن يكون بعد أو مساوياً لتاريخ انتهاء العقد السابق (${formatDate(form.previous_end_date)})`
+    }
+    if (!form.duration_months || isNaN(form.duration_months) || parseInt(form.duration_months) < 1) errs.duration_months = 'مدة العقد مطلوبة (أشهر)'
+    if (!form.monthly_rate || isNaN(form.monthly_rate) || parseFloat(form.monthly_rate) <= 0) errs.monthly_rate = 'السعر الشهري مطلوب'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -88,7 +310,6 @@ export default function Contracts() {
     if (!validateForm()) return
     setSaving(true)
     try {
-      // Check if stand has active contract
       const { data: existing } = await supabase
         .from('contracts')
         .select('id')
@@ -99,16 +320,19 @@ export default function Contracts() {
       let status = form.status
       if (existing && existing.length > 0) status = 'upcoming'
       else {
-        const today = new Date().toISOString().split('T')[0]
+        const today = toLocalDateStr(new Date())
         if (form.start_date > today) status = 'upcoming'
       }
 
       const { error } = await supabase.from('contracts').insert([{
         stand_id: form.stand_id,
         client_id: form.client_id,
-        rental_type: form.rental_type,
         start_date: form.start_date,
         end_date: form.end_date,
+        duration_months: parseInt(form.duration_months) || null,
+        payment_frequency: form.payment_interval,
+        monthly_rate: parseFloat(form.monthly_rate),
+        price_per_period: parseFloat(form.price_per_period),
         total_value: parseFloat(form.total_value),
         status,
         notes: form.notes || null,
@@ -116,7 +340,7 @@ export default function Contracts() {
       if (error) throw error
       toast({ title: 'تم الحفظ', description: `تم إنشاء العقد بحالة: ${status === 'upcoming' ? 'قادم' : 'نشط'}`, variant: 'success' })
       setDialogOpen(false)
-      setForm(EMPTY_FORM)
+      setForm({ ...EMPTY_FORM, start_date: todayStr() })
       fetchData()
     } catch (e) { toast({ title: 'خطأ', description: e.message, variant: 'error' }) }
     setSaving(false)
@@ -144,6 +368,10 @@ export default function Contracts() {
     { value: 'terminated', label: 'مُنهى' },
   ]
 
+  const intervalMonths = INTERVAL_MONTHS[form.payment_interval] || 1
+  const monthlyRate = parseFloat(form.monthly_rate) || 0
+  const perPeriodAmount = monthlyRate * intervalMonths
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="العقود" description={`${contracts.length} عقد إجمالاً`}>
@@ -164,8 +392,8 @@ export default function Contracts() {
           ))}
         </div>
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9 h-8 text-xs" />
+          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} className="pe-9 h-8 text-xs" />
         </div>
       </div>
 
@@ -178,21 +406,33 @@ export default function Contracts() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>اللوحة</TableHead>
-                  <TableHead>العميل</TableHead>
-                  <TableHead>النوع</TableHead>
-                  <TableHead>البداية</TableHead>
-                  <TableHead>النهاية</TableHead>
-                  <TableHead>القيمة</TableHead>
-                  <TableHead>المدفوع</TableHead>
-                  <TableHead>المتبقي</TableHead>
-                  <TableHead>الحالة</TableHead>
+                  <TableHead>اللوحة</TableHead><TableHead>العميل</TableHead><TableHead>المدة</TableHead>
+                  <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة</TableHead>
+                  <TableHead>المدفوع</TableHead><TableHead>مستحق الآن</TableHead><TableHead>الحالة</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(c => {
                   const paid = paymentsMap[c.id] || 0
-                  const rem = safeNum(c.total_value) - paid
+                  const owed = Math.max(0, safeNum(c.total_value) - paid)
+                  const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+                  // Period-based amount due
+                  let periodDue = 0
+                  if (realStatus === 'active' && c.start_date && c.payment_frequency) {
+                    const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+                    const now = new Date()
+                    const start = new Date(c.start_date)
+                    const end = c.end_date ? new Date(c.end_date) : null
+                    const nowCapped = end && now > end ? end : now
+                    const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
+                    const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+                    const periodRate = monthlyRate * intervalMonths
+                    const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                    const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+                    const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+                    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+                    periodDue = Math.max(0, periodsDue * periodRate - paid)
+                  }
                   return (
                     <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                       <TableCell>
@@ -203,13 +443,28 @@ export default function Contracts() {
                         <p className="font-medium text-sm">{c.clients?.name}</p>
                         <p className="text-xs text-muted-foreground">{c.clients?.phone}</p>
                       </TableCell>
-                      <TableCell className="text-sm">{rentalTypeLabels[c.rental_type]}</TableCell>
+                      <TableCell className="text-sm">{c.duration_months} شهر</TableCell>
                       <TableCell className="text-sm">{formatDate(c.start_date)}</TableCell>
-                      <TableCell className="text-sm">{formatDate(c.end_date)}</TableCell>
+                      <TableCell className="text-sm">
+                        <p>{formatDate(c.end_date)}</p>
+                        {realStatus !== 'expired' && realStatus !== 'terminated' && c.end_date && (() => {
+                          const daysLeft = Math.ceil((new Date(c.end_date) - new Date()) / 86400000)
+                          if (daysLeft <= 0) return null
+                          return (
+                            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded-full mt-0.5 inline-block', daysLeft <= 30 ? 'bg-destructive/15 text-destructive' : daysLeft <= 90 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success')}>
+                              {daysLeft} يوم
+                            </span>
+                          )
+                        })()}
+                      </TableCell>
                       <TableCell className="text-sm font-medium">{formatCurrency(c.total_value)}</TableCell>
-                      <TableCell className="text-sm text-success">{formatCurrency(paid)}</TableCell>
-                      <TableCell className={`text-sm font-medium ${rem > 0 ? 'text-destructive' : 'text-success'}`}>{formatCurrency(rem)}</TableCell>
-                      <TableCell><StatusBadge status={c.status} /></TableCell>
+                      <TableCell className={`text-sm font-medium ${paid >= safeNum(c.total_value) ? 'text-success' : 'text-muted-foreground'}`}>
+                        {formatCurrency(paid)}
+                      </TableCell>
+                      <TableCell className={`text-sm font-medium ${periodDue > 0 ? 'text-destructive' : 'text-success'}`}>
+                        {formatCurrency(periodDue)}
+                      </TableCell>
+                      <TableCell><StatusBadge status={realStatus} /></TableCell>
                     </TableRow>
                   )
                 })}
@@ -224,46 +479,82 @@ export default function Contracts() {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>إنشاء عقد جديد</DialogTitle></DialogHeader>
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-            <FormField label="اللوحة الإعلانية" required error={formErrors.stand_id}>
-              <Select value={form.stand_id} onValueChange={v => setForm({...form, stand_id: v})}>
-                <SelectTrigger><SelectValue placeholder="اختر اللوحة" /></SelectTrigger>
-                <SelectContent>
-                  {stands.map(s => <SelectItem key={s.id} value={s.id}>{s.code} — {s.address?.slice(0,30)}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <FormField label="اللوحة الإعلانية" required error={formErrors.stand_id} className="sm:col-span-2">
+              <StandSearchSelect
+                stands={stands}
+                value={form.stand_id}
+                onChange={onStandChange}
+                error={formErrors.stand_id}
+              />
             </FormField>
-            <FormField label="العميل" required error={formErrors.client_id}>
-              <div className="flex gap-2">
-                <Select value={form.client_id} onValueChange={v => setForm({...form, client_id: v})}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="اختر العميل" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Button size="icon" variant="outline" onClick={() => setClientDialogOpen(true)} title="إضافة عميل جديد">
-                  <UserPlus className="w-4 h-4" />
-                </Button>
-              </div>
-            </FormField>
-            <FormField label="نوع الإيجار">
-              <Select value={form.rental_type} onValueChange={v => { setForm({...form, rental_type: v}); updateEndDate(form.start_date, v) }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">شهري</SelectItem>
-                  <SelectItem value="quarterly">ربع سنوي</SelectItem>
-                  <SelectItem value="semi_annual">نصف سنوي</SelectItem>
-                  <SelectItem value="annual">سنوي</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="قيمة العقد (جنيه)" required error={formErrors.total_value}>
-              <Input type="number" value={form.total_value} onChange={e => setForm({...form, total_value: e.target.value})} placeholder="0" />
+            <FormField label="العميل" required error={formErrors.client_id} className="sm:col-span-2">
+              <ClientSearchSelect
+                clients={clients}
+                value={form.client_id}
+                onChange={v => setForm(f => ({ ...f, client_id: v }))}
+                onAddNew={() => setClientDialogOpen(true)}
+              />
             </FormField>
             <FormField label="تاريخ البداية" required error={formErrors.start_date}>
-              <Input type="date" value={form.start_date} onChange={e => { setForm({...form, start_date: e.target.value}); updateEndDate(e.target.value, form.rental_type) }} />
+              <Input
+                type="date"
+                value={form.start_date}
+                onChange={e => onFormChange('start_date', e.target.value)}
+              />
+              {form.previous_end_date && (
+                <p className="text-xs text-muted-foreground mt-1">العقد السابق ينتهي: <span className="font-medium">{formatDate(form.previous_end_date)}</span> — يجب أن يكون البداية ≥ نهاية السابق</p>
+              )}
             </FormField>
-            <FormField label="تاريخ النهاية" required error={formErrors.end_date}>
-              <Input type="date" value={form.end_date} onChange={e => setForm({...form, end_date: e.target.value})} />
+            <FormField label="مدة العقد (أشهر)" required error={formErrors.duration_months}>
+              <Input
+                type="number"
+                value={form.duration_months}
+                min="1"
+                onChange={e => onFormChange('duration_months', e.target.value)}
+                placeholder="مثال: 12"
+              />
+            </FormField>
+            <FormField label="تاريخ النهاية">
+              <DateInput value={form.end_date} readOnly className="bg-muted cursor-not-allowed" />
+            </FormField>
+            <FormField label="فترة الدفع" required>
+              <Select value={form.payment_interval} onValueChange={v => onFormChange('payment_interval', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(INTERVAL_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="السعر الشهري (جنيه)" required error={formErrors.monthly_rate}>
+              <Input
+                type="number"
+                value={form.monthly_rate}
+                onChange={e => onFormChange('monthly_rate', e.target.value)}
+                placeholder="سعر الشهر الواحد"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                مثال: 100 جنيه في الشهر × {form.duration_months || '?'} شهر = {form.total_value ? formatCurrency(parseFloat(form.total_value)).replace('جنيه', '').trim() + ' جنيه' : '?'}
+              </p>
+            </FormField>
+            {monthlyRate > 0 && form.duration_months > 0 && (
+              <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[form.payment_interval].split('(')[0].trim()})`}>
+                <div className="h-10 px-3 flex items-center bg-muted/50 rounded-lg border border-border text-sm">
+                  <span className="font-bold text-success">
+                    {formatCurrency(perPeriodAmount)}
+                  </span>
+                  <span className="text-muted-foreground ms-2 text-xs">
+                    كل {intervalMonths} {intervalMonths === 1 ? 'شهر' : intervalMonths === 3 ? 'أشهر' : intervalMonths === 6 ? 'أشهر' : 'شهر'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  عدد الدفعات: {Math.ceil(parseInt(form.duration_months) / intervalMonths)} دفعة
+                </p>
+              </FormField>
+            )}
+            <FormField label="القيمة الإجمالية">
+              <Input type="number" value={form.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
             </FormField>
             <FormField label="ملاحظات" className="sm:col-span-2">
               <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="ملاحظات اختيارية..." rows={3} />

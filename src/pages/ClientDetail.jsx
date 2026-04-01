@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Save, X, Phone, FileText } from 'lucide-react'
+import { ArrowLeft, Edit2, Save, X, Phone, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, rentalTypeLabels } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, computeContractStatus } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,18 +59,38 @@ export default function ClientDetail() {
   if (loading) return <LoadingScreen />
   if (!client) return <div className="p-8 text-center text-muted-foreground">العميل غير موجود</div>
 
-  const active = contracts.filter(c => c.status === 'active')
-  const expired = contracts.filter(c => c.status === 'expired' || c.status === 'terminated')
+  const active = contracts.filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
+  const expired = contracts.filter(c => ['expired', 'terminated'].includes(computeContractStatus(c.start_date, c.end_date, c.status)))
   const totalValue = contracts.reduce((a, c) => a + safeNum(c.total_value), 0)
   const totalPaid = contracts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
-  const remaining = totalValue - totalPaid
+  const owed = Math.max(0, totalValue - totalPaid)
+  const credit = Math.max(0, totalPaid - totalValue)
+
+  // Period-based amount due across all active contracts
+  const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+  const now = new Date()
+  const periodDue = active.reduce((acc, c) => {
+    if (!c.start_date || !c.payment_frequency) return acc
+    const start = new Date(c.start_date)
+    const end = c.end_date ? new Date(c.end_date) : null
+    const nowCapped = end && now > end ? end : now
+    const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
+    const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+    const periodRate = monthlyRate * intervalMonths
+    const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+    const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+    const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    const due = periodsDue * periodRate - (paymentsMap[c.id] || 0)
+    return acc + Math.max(0, due)
+  }, 0)
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
-          <ArrowRight className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center text-xl font-black">
@@ -112,11 +132,12 @@ export default function ClientDetail() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard title="عقود نشطة" value={active.length} icon={FileText} variant="success" />
         <StatCard title="عقود منتهية" value={expired.length} icon={FileText} variant="default" />
         <StatCard title="إجمالي المدفوع" value={formatCurrency(totalPaid)} icon={FileText} variant="info" />
-        <StatCard title="المتبقي" value={formatCurrency(remaining)} icon={FileText} variant={remaining > 0 ? 'danger' : 'success'} />
+        <StatCard title="مستحق الآن" value={formatCurrency(periodDue)} icon={FileText} variant={periodDue > 0 ? 'danger' : 'success'} />
+        <StatCard title="عليه / مستحق" value={formatCurrency(owed)} icon={FileText} variant={owed > 0 ? 'danger' : 'success'} />
       </div>
 
       {/* Contracts table */}
@@ -138,26 +159,27 @@ export default function ClientDetail() {
                     <TableHead>النهاية</TableHead>
                     <TableHead>القيمة</TableHead>
                     <TableHead>المدفوع</TableHead>
-                    <TableHead>المتبقي</TableHead>
+                    <TableHead>له / عليه</TableHead>
                     <TableHead>الحالة</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contracts.map(c => {
                     const paid = paymentsMap[c.id] || 0
-                    const rem = safeNum(c.total_value) - paid
+                    const contractOwed = Math.max(0, safeNum(c.total_value) - paid)
+                    const contractCredit = Math.max(0, paid - safeNum(c.total_value))
                     return (
                       <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                         <TableCell>
                           <p className="font-medium">{c.stands?.code}</p>
                           <p className="text-xs text-muted-foreground">{c.stands?.address?.slice(0,30)}</p>
                         </TableCell>
-                        <TableCell>{rentalTypeLabels[c.rental_type] || c.rental_type}</TableCell>
+                        <TableCell>{c.duration_months} شهر</TableCell>
                         <TableCell>{formatDate(c.start_date)}</TableCell>
                         <TableCell>{formatDate(c.end_date)}</TableCell>
                         <TableCell>{formatCurrency(c.total_value)}</TableCell>
-                        <TableCell className="text-success">{formatCurrency(paid)}</TableCell>
-                        <TableCell className={rem > 0 ? 'text-destructive' : 'text-success'}>{formatCurrency(rem)}</TableCell>
+                        <TableCell className={paid >= safeNum(c.total_value) ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
+                        <TableCell className={contractOwed > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>{formatCurrency(Math.abs(contractOwed))}</TableCell>
                         <TableCell><StatusBadge status={c.status} /></TableCell>
                       </TableRow>
                     )

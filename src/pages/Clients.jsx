@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Users, Phone, FileText } from 'lucide-react'
+import { Plus, Search, Users, Phone, FileText, Building2, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, safeNum } from '@/lib/utils'
+import { formatCurrency, formatDate, safeNum, computeContractStatus } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,7 +29,7 @@ export default function Clients() {
     setLoading(true)
     const [{ data: c }, { data: contracts }, { data: payments }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
-      supabase.from('contracts').select('id, client_id, status, total_value'),
+      supabase.from('contracts').select('id, client_id, status, total_value, start_date, end_date, duration_months, payment_frequency, stands(code, address)'),
       supabase.from('payments').select('id, contract_id, amount'),
     ])
     setClients(c || [])
@@ -59,10 +59,40 @@ export default function Clients() {
 
   function clientStats(clientId) {
     const cts = contractsMap[clientId] || []
-    const active = cts.filter(c => c.status === 'active').length
+    const active = cts.filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
     const totalValue = cts.reduce((a, c) => a + safeNum(c.total_value), 0)
     const totalPaid = cts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
-    return { active, total: cts.length, totalValue, totalPaid, remaining: totalValue - totalPaid }
+    const owed = Math.max(0, totalValue - totalPaid)
+
+    // periodDue: sum of period-based amounts due across all active contracts
+    const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+    const now = new Date()
+    let periodDue = 0
+    active.forEach(c => {
+      if (!c.start_date || !c.payment_frequency) return
+      const start = new Date(c.start_date)
+      const end = c.end_date ? new Date(c.end_date) : null
+      const nowCapped = end && now > end ? end : now
+      const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
+      const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+      const periodRate = monthlyRate * intervalMonths
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+      const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+      periodDue += Math.max(0, periodsDue * periodRate - (paymentsMap[c.id] || 0))
+    })
+
+    // Nearest contract expiry among active contracts
+    const nearestContract = active.reduce((nearest, c) => {
+      if (!c.end_date) return nearest
+      const daysLeft = Math.ceil((new Date(c.end_date) - now) / 86400000)
+      if (daysLeft <= 0) return nearest
+      if (!nearest || daysLeft < nearest.daysLeft) return { ...c, daysLeft }
+      return nearest
+    }, null)
+
+    return { active: active.length, total: cts.length, totalValue, totalPaid, owed, periodDue, nearestContract }
   }
 
   async function handleSave() {
@@ -94,8 +124,8 @@ export default function Clients() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9" />
+        <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)} className="pe-9" />
       </div>
 
       {filtered.length === 0 ? (
@@ -116,7 +146,7 @@ export default function Clients() {
                 className="text-start bg-card border border-border rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
               >
                 {/* Avatar + Name */}
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-4 ">
                   <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center text-lg font-black flex-shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     {client.name?.charAt(0)}
                   </div>
@@ -130,7 +160,7 @@ export default function Clients() {
                   </div>
                 </div>
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
+                <div className="grid grid-cols-3 gap-2 py-3 border-t border-border">
                   <div className="text-center">
                     <p className="text-lg font-bold text-foreground">{stats.active}</p>
                     <p className="text-xs text-muted-foreground">نشط</p>
@@ -140,10 +170,42 @@ export default function Clients() {
                     <p className="text-xs text-muted-foreground">إجمالي</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-destructive truncate">{formatCurrency(stats.remaining).replace(' جنيه', '')}</p>
-                    <p className="text-xs text-muted-foreground">متبقي</p>
+                    <p className="text-sm font-bold text-success truncate">{formatCurrency(stats.totalPaid).replace(' جنيه', '')}</p>
+                    <p className="text-xs text-muted-foreground">المدفوع</p>
                   </div>
                 </div>
+
+                {/* periodDue / owed row */}
+                {(stats.periodDue > 0 || stats.owed > 0) && (
+                  <div className="flex items-center gap-2 py-2 border-t border-border ">
+                    {stats.periodDue > 0 && (
+                      <div className="flex items-center gap-1 text-destructive ps-1">
+                        <Calendar className="w-3 h-3" />
+                        <span className="text-xs font-medium">مستحق: {formatCurrency(stats.periodDue).replace(' جنيه', '')}</span>
+                      </div>
+                    )}
+                    {stats.owed > 0 && stats.periodDue === 0 && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        <span className="text-xs">الباقي: {formatCurrency(stats.owed).replace(' جنيه', '')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Nearest contract */}
+                {stats.nearestContract && (
+                  <div className="flex items-center gap-2 py-2 border-t border-border ps-1">
+                    <Building2 className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate">{stats.nearestContract.stands?.code} — {stats.nearestContract.stands?.address}</p>
+                      <p className="text-xs text-muted-foreground">ينتهي: {formatDate(stats.nearestContract.end_date)}</p>
+                    </div>
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${stats.nearestContract.daysLeft <= 30 ? 'bg-destructive/15 text-destructive' : stats.nearestContract.daysLeft <= 90 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success'}`}>
+                      {stats.nearestContract.daysLeft} يوم
+                    </span>
+                  </div>
+                )}
               </button>
             )
           })}
