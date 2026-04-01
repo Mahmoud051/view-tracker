@@ -35,7 +35,6 @@ function Layout() {
       <Sidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        className="hidden xl:flex"
       />
       {sidebarOpen && (
         <div

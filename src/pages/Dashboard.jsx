@@ -227,7 +227,7 @@ export default function Dashboard() {
 
       {/* Stats Row 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="إجمالي اللوحات" value={stats.total} icon={Building2} variant="default" />
+        <StatCard title="إجمالي اللوحات" value={stats.total} icon={Building2} variant="default"  />
         <StatCard title="لوحات مؤجرة" value={stats.rented} icon={CheckCircle} variant="success" />
         <StatCard title="لوحات متاحة" value={stats.available} icon={Building2} variant="info" />
         <StatCard title="إجمالي العقود" value={stats.totalContracts} icon={FileText} variant="default" />

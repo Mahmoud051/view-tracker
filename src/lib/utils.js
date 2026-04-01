@@ -89,6 +89,26 @@ export const paymentFrequencyLabels = {
   annual: 'سنوي',
 }
 
+export const paymentIntervalMonths = {
+  monthly: 1,
+  quarterly: 3,
+  semi_annual: 6,
+  annual: 12,
+}
+
+export function getDurationCompatibilityError(durationMonths, paymentFrequency) {
+  const interval = paymentIntervalMonths[paymentFrequency] || 1
+  const months = Number(durationMonths)
+
+  if (!Number.isFinite(months) || months <= 0) return 'مدة العقد مطلوبة (أشهر)'
+  if (!Number.isInteger(months)) return 'مدة العقد يجب أن تكون رقماً صحيحاً بدون كسور'
+  if (months < interval) return `مدة العقد (${months}) شهر أقل من فترة الدفع (${interval}) شهر`
+  if (months % interval !== 0) {
+    return `المدة يجب أن تكون مضاعفات لـ ${interval} شهر (مثلاً: ${interval}، ${interval * 2}، ${interval * 3}...)`
+  }
+  return ''
+}
+
 export const paymentMethodLabels = {
   cash: 'نقداً',
   transfer: 'تحويل بنكي',

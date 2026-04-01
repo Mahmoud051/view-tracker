@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Search, FileText, UserPlus, X, ChevronDown, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn, paymentIntervalMonths, getDurationCompatibilityError } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,12 +16,7 @@ import { Badge } from '@/components/ui/badge'
 
 // payment interval = how many months between each payment
 // monthly: 1, quarterly: 3, semi_annual: 6, annual: 12
-const INTERVAL_MONTHS = {
-  monthly: 1,
-  quarterly: 3,
-  semi_annual: 6,
-  annual: 12,
-}
+const INTERVAL_MONTHS = paymentIntervalMonths
 
 const INTERVAL_LABELS = {
   monthly: 'شهري (كل شهر)',
@@ -300,12 +295,8 @@ export default function Contracts() {
     if (form.previous_end_date && form.start_date < form.previous_end_date) {
       errs.start_date = `يجب أن يكون بعد أو مساوياً لتاريخ انتهاء العقد السابق (${formatDate(form.previous_end_date)})`
     }
-    if (!form.duration_months || isNaN(form.duration_months) || parseInt(form.duration_months) < 1) errs.duration_months = 'مدة العقد مطلوبة (أشهر)'
-    const interval = INTERVAL_MONTHS[form.payment_interval] || 1
-    const months = parseInt(form.duration_months)
-    if (!errs.duration_months && months % interval !== 0) {
-      errs.duration_months = `المدة يجب أن تكون مضاعفات لـ ${interval} شهر (مثلاً: ${interval}، ${interval * 2}، ${interval * 3}...)`
-    }
+    const durationError = getDurationCompatibilityError(form.duration_months, form.payment_interval)
+    if (durationError) errs.duration_months = durationError
     if (!form.monthly_rate || isNaN(form.monthly_rate) || parseFloat(form.monthly_rate) <= 0) errs.monthly_rate = 'السعر الشهري مطلوب'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
@@ -376,6 +367,7 @@ export default function Contracts() {
   const intervalMonths = INTERVAL_MONTHS[form.payment_interval] || 1
   const monthlyRate = parseFloat(form.monthly_rate) || 0
   const perPeriodAmount = monthlyRate * intervalMonths
+  const durationErrorPreview = getDurationCompatibilityError(form.duration_months, form.payment_interval)
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -501,8 +493,7 @@ export default function Contracts() {
               />
             </FormField>
             <FormField label="تاريخ البداية" required error={formErrors.start_date}>
-              <Input
-                type="date"
+              <DateInput
                 value={form.start_date}
                 onChange={e => onFormChange('start_date', e.target.value)}
               />
@@ -518,9 +509,9 @@ export default function Contracts() {
                 onChange={e => onFormChange('duration_months', e.target.value)}
                 placeholder="مثال: 12"
               />
-              {form.duration_months > 0 && (parseInt(form.duration_months) % intervalMonths) !== 0 && (
+              {form.duration_months > 0 && durationErrorPreview && (
                 <p className="text-xs text-warning mt-1">
-                  ⚠ المدة ({form.duration_months} شهر) لا تتوافق مع فترة الدفع ({intervalMonths} شهر) — لن تكفي الدفعات لتغطية كامل المدة
+                  ⚠ {durationErrorPreview}
                 </p>
               )}
             </FormField>

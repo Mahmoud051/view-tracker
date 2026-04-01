@@ -13,10 +13,10 @@ import { Textarea } from '@/components/ui/index'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { PageHeader, StatusBadge, EmptyState, LoadingScreen, FormField } from '@/components/ui/shared'
 
-const EMPTY_FORM = {
+const buildEmptyForm = () => ({
   code: '', address: '', width: '', height: '', sides: '1', desc: '',
-  gov_license_number: '', gov_rental_start: '', gov_rental_end: '', gov_rental_cost: '',
-}
+  gov_license_number: '', gov_rental_start: todayStr(), gov_rental_end: '', gov_rental_cost: '',
+})
 
 export default function Stands() {
   const [stands, setStands] = useState([])
@@ -26,7 +26,7 @@ export default function Stands() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState(buildEmptyForm())
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [photoFile, setPhotoFile] = useState(null)
@@ -101,7 +101,7 @@ export default function Stands() {
       if (error) throw error
       toast({ title: 'تم الحفظ', description: 'تم إضافة اللوحة بنجاح', variant: 'success' })
       setDialogOpen(false)
-      setForm(EMPTY_FORM)
+      setForm(buildEmptyForm())
       setPhotoFile(null)
       fetchData()
     } catch (err) {
@@ -116,7 +116,7 @@ export default function Stands() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="اللوحات الإعلانية" description={`${stands.length} لوحة إجمالاً`}>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => { setForm(buildEmptyForm()); setDialogOpen(true) }}>
           <Plus className="w-4 h-4" /> إضافة لوحة
         </Button>
       </PageHeader>
@@ -295,14 +295,22 @@ export default function Stands() {
               <Input type="number" value={form.gov_rental_cost} onChange={e => setForm({ ...form, gov_rental_cost: e.target.value })} placeholder="0" />
             </FormField>
             <FormField label="تاريخ بداية الترخيص">
-              <DateInput value={form.gov_rental_start} onChange={e => setForm({ ...form, gov_rental_start: e.target.value })} />
+              <DateInput
+                value={form.gov_rental_start}
+                onChange={e => setForm(prev => ({ ...prev, gov_rental_start: e.target.value }))}
+                placeholder="اختر التاريخ"
+              />
             </FormField>
             <FormField label="تاريخ انتهاء الترخيص">
-              <DateInput value={form.gov_rental_end} onChange={e => setForm({ ...form, gov_rental_end: e.target.value })} />
+              <DateInput
+                value={form.gov_rental_end}
+                onChange={e => setForm(prev => ({ ...prev, gov_rental_end: e.target.value }))}
+                placeholder="اختر التاريخ"
+              />
             </FormField>
           </div>
           <DialogFooter className="justify-end">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+            <Button variant="outline" onClick={() => { setForm(buildEmptyForm()); setDialogOpen(false) }}>إلغاء</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'جاري الحفظ...' : 'حفظ اللوحة'}
             </Button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Download, BarChart3, FileText, Wrench, TrendingUp } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -32,6 +33,7 @@ const defaultFrom = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() - 
 const defaultTo = toLocalDateStr(now)
 
 export default function Reports() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
   // Revenue report
@@ -244,7 +246,7 @@ export default function Reports() {
         <TabsContent value="revenue" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <CardTitle className="flex flex-row-reverse items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" /> تقرير الإيرادات
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
@@ -255,11 +257,11 @@ export default function Reports() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <StatCard title="إجمالي الإيرادات في الفترة" value={formatCurrency(revData?.total || 0)} icon={TrendingUp} variant="success" className="max-w-xs" iconLeft />
+              <StatCard title="إجمالي الإيرادات في الفترة" value={formatCurrency(revData?.total || 0)} icon={TrendingUp} variant="success" className="max-w-xs" />
 
               {revData?.chartData?.length > 0 && (
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={revData.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <BarChart data={revData.chartData} margin={{ top: 5, right: 5, left: 30, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
@@ -276,9 +278,9 @@ export default function Reports() {
                 <TableBody>
                   {(revData?.byStand || []).sort((a,b) => b.total - a.total).map(s => (
                     <TableRow key={s.code}>
-                      <TableCell className="font-semibold text-start">{s.code}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate text-start">{s.address?.slice(0,40)}</TableCell>
-                      <TableCell className="font-medium text-success text-start">{formatCurrency(s.total)}</TableCell>
+                      <TableCell className="font-semibold">{s.code}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{s.address?.slice(0,40)}</TableCell>
+                      <TableCell className="font-medium text-success">{formatCurrency(s.total)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -291,7 +293,7 @@ export default function Reports() {
         <TabsContent value="contracts" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <CardTitle className="flex flex-row-reverse items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" /> تقرير العقود
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
@@ -303,11 +305,11 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <StatCard title="عدد العقود" value={ctData?.total || 0} icon={FileText} variant="default" iconLeft />
-                <StatCard title="إجمالي القيمة" value={formatCurrency(ctData?.totalValue || 0)} icon={FileText} variant="info" iconLeft />
-                <StatCard title="المدفوع" value={formatCurrency(ctData?.totalPaid || 0)} icon={FileText} variant="success" iconLeft />
-                <StatCard title="مستحق الآن" value={formatCurrency(ctData?.periodDue || 0)} icon={FileText} variant={ctData?.periodDue > 0 ? 'danger' : 'success'} iconLeft />
-                <StatCard title="الباقي على العقود" value={formatCurrency(ctData?.totalOwed || 0)} icon={FileText} variant={ctData?.totalOwed > 0 ? 'warning' : 'success'} iconLeft />
+                <StatCard title="عدد العقود" value={ctData?.total || 0} icon={FileText} variant="default" />
+                <StatCard title="إجمالي القيمة" value={formatCurrency(ctData?.totalValue || 0)} icon={FileText} variant="info" />
+                <StatCard title="المدفوع" value={formatCurrency(ctData?.totalPaid || 0)} icon={FileText} variant="success" />
+                <StatCard title="مستحق الآن" value={formatCurrency(ctData?.periodDue || 0)} icon={FileText} variant={ctData?.periodDue > 0 ? 'danger' : 'success'} />
+                <StatCard title="الباقي على العقود" value={formatCurrency(ctData?.totalOwed || 0)} icon={FileText} variant={ctData?.totalOwed > 0 ? 'warning' : 'success'} />
               </div>
 
               <div className="overflow-x-auto">
@@ -340,16 +342,16 @@ export default function Reports() {
                         periodDue = Math.max(0, periodsDue * periodRate - paid)
                       }
                       return (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-semibold text-start">{c.stands?.code}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate text-start">{c.stands?.address || '—'}</TableCell>
-                          <TableCell className="text-start">{c.clients?.name}</TableCell>
-                          <TableCell className="text-sm text-start">{c.duration_months ? `${c.duration_months} شهر` : '—'}</TableCell>
-                          <TableCell className="text-start">{formatDate(c.start_date)}</TableCell>
-                          <TableCell className="text-start">{formatDate(c.end_date)}</TableCell>
-                          <TableCell className="text-start">{formatCurrency(c.total_value)}</TableCell>
-                          <TableCell className="text-start">{formatCurrency(paid)}</TableCell>
-                          <TableCell className="text-start">{formatCurrency(periodDue)}</TableCell>
+                        <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
+                          <TableCell className="font-semibold">{c.stands?.code}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{c.stands?.address || '—'}</TableCell>
+                          <TableCell>{c.clients?.name}</TableCell>
+                          <TableCell className="text-sm">{c.duration_months ? `${c.duration_months} شهر` : '—'}</TableCell>
+                          <TableCell>{formatDate(c.start_date)}</TableCell>
+                          <TableCell>{formatDate(c.end_date)}</TableCell>
+                          <TableCell>{formatCurrency(c.total_value)}</TableCell>
+                          <TableCell className={paid >= safeNum(c.total_value) ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
+                          <TableCell className={periodDue > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>{formatCurrency(periodDue)}</TableCell>
                           <TableCell>
                             <span className={`text-xs font-medium px-2 py-1 rounded-full ${realStatus==='active'?'bg-success/15 text-success':realStatus==='expired'?'bg-destructive/15 text-destructive':realStatus==='terminated'?'bg-muted text-muted-foreground':'bg-primary/15 text-primary'}`}>
                               {statusLabels[realStatus] || realStatus}
@@ -369,7 +371,7 @@ export default function Reports() {
         <TabsContent value="maintenance" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <CardTitle className="flex flex-row-reverse items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-primary" /> تقرير الصيانة
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
@@ -381,9 +383,9 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <StatCard title="إجمالي تكلفة الصيانة" value={formatCurrency(mntData?.total || 0)} icon={Wrench} variant="warning" iconLeft />
-                <StatCard title="مدفوع للفنيين" value={formatCurrency(mntData?.paid || 0)} icon={Wrench} variant="success" iconLeft />
-                <StatCard title="غير مدفوع" value={formatCurrency(mntData?.unpaid || 0)} icon={Wrench} variant="danger" iconLeft />
+                <StatCard title="إجمالي تكلفة الصيانة" value={formatCurrency(mntData?.total || 0)} icon={Wrench} variant="warning" />
+                <StatCard title="مدفوع للفنيين" value={formatCurrency(mntData?.paid || 0)} icon={Wrench} variant="success" />
+                <StatCard title="غير مدفوع" value={formatCurrency(mntData?.unpaid || 0)} icon={Wrench} variant="danger" />
               </div>
 
               {(mntData?.byStand || []).length > 0 && (
@@ -397,9 +399,9 @@ export default function Reports() {
                   <TableBody>
                     {mntData.byStand.sort((a,b) => b.total - a.total).map(s => (
                       <TableRow key={s.code}>
-                        <TableCell className="font-semibold text-start">{s.code}</TableCell>
-                        <TableCell className="font-medium text-start">{formatCurrency(s.total)}</TableCell>
-                        <TableCell className="text-success text-start">{formatCurrency(s.paid)}</TableCell>
+                        <TableCell className="font-semibold">{s.code}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(s.total)}</TableCell>
+                        <TableCell className="text-success">{formatCurrency(s.paid)}</TableCell>
                         <TableCell className={s.unpaid > 0 ? 'text-destructive' : 'text-muted-foreground'}>{formatCurrency(s.unpaid)}</TableCell>
                       </TableRow>
                     ))}

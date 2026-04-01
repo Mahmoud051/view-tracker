@@ -33,7 +33,7 @@ export function Sidebar({ open, onClose, className }) {
         'flex flex-col bg-card border-e border-border shadow-2xl transition-transform duration-300 ease-in-out z-50',
         'xl:relative xl:translate-x-0 xl:z-auto xl:shadow-none',
         'fixed top-0 start-0 bottom-0 w-[var(--sidebar-width)]',
-        open ? 'translate-x-0' : '-translate-x-full',
+        open ? 'translate-x-0' : 'translate-x-full',
         className
       )}
     >

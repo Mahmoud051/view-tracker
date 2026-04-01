@@ -11,7 +11,7 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmT
         <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <AlertDialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
+            'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
             'w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -118,7 +118,7 @@ export function LoadingScreen() {
 }
 
 // ---- StatCard ----
-export function StatCard({ title, value, icon: Icon, description, variant = 'default', className, iconLeft = false }) {
+export function StatCard({ title, value, icon: Icon, description, variant = 'default', className }) {
   const variants = {
     default: 'from-primary/10 to-primary/5 border-primary/20',
     success: 'from-success/10 to-success/5 border-success/20',
@@ -135,8 +135,7 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
   }
   return (
     <div className={cn(
-      'rounded-2xl border bg-gradient-to-br p-5 flex items-center gap-4 card-hover',
-      iconLeft ? 'flex-row' : 'flex-row-reverse',
+      'rounded-2xl border bg-gradient-to-br p-5 flex flex-row-reverse items-start gap-4 card-hover',
       variants[variant] || variants.default,
       className
     )}>
@@ -145,7 +144,7 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
           <Icon className="w-6 h-6" />
         </div>
       )}
-      <div className={cn('flex-1 min-w-0', iconLeft ? 'text-left' : 'text-right')}>
+      <div className="flex-1 min-w-0 text-right">
         <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
         <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}

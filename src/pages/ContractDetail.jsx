@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
+import { ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr, paymentIntervalMonths, getDurationCompatibilityError } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,12 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/index'
 
-const INTERVAL_MONTHS = {
-  monthly: 1,
-  quarterly: 3,
-  semi_annual: 6,
-  annual: 12,
-}
+const INTERVAL_MONTHS = paymentIntervalMonths
 
 const INTERVAL_LABELS = {
   monthly: 'شهري (كل شهر)',
@@ -49,6 +44,7 @@ export default function ContractDetail() {
   const [deleteContractConfirm, setDeleteContractConfirm] = useState(false)
   const [editContractOpen, setEditContractOpen] = useState(false)
   const [editContractForm, setEditContractForm] = useState({})
+  const [editFormErrors, setEditFormErrors] = useState({})
   const [allStands, setAllStands] = useState([])
   const [allClients, setAllClients] = useState([])
 
@@ -153,6 +149,20 @@ export default function ContractDetail() {
     } catch { setEditContractForm(f => ({ ...f, end_date: '', total_value: '', price_per_period: '' })) }
   }
 
+  function validateEditContractForm() {
+    const errs = {}
+    if (!editContractForm.stand_id) errs.stand_id = 'اختر اللوحة'
+    if (!editContractForm.client_id) errs.client_id = 'اختر العميل'
+    if (!editContractForm.start_date) errs.start_date = 'تاريخ البداية مطلوب'
+    const durationError = getDurationCompatibilityError(editContractForm.duration_months, editContractForm.payment_frequency)
+    if (durationError) errs.duration_months = durationError
+    if (!editContractForm.monthly_rate || isNaN(editContractForm.monthly_rate) || parseFloat(editContractForm.monthly_rate) <= 0) {
+      errs.monthly_rate = 'السعر الشهري مطلوب'
+    }
+    setEditFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   // Can start contract manually? Only upcoming contracts, and only if the stand has no active contract
   // We fetch the stand's active contract to determine this
   const [standActive, setStandActive] = useState(null)
@@ -214,6 +224,7 @@ export default function ContractDetail() {
   }
 
   async function saveEditedContract() {
+    if (!validateEditContractForm()) return
     setSaving(true)
     try {
       const { error } = await supabase.from('contracts').update({
@@ -231,6 +242,7 @@ export default function ContractDetail() {
       if (error) throw error
       toast({ title: 'تم تحديث العقد', variant: 'success' })
       setEditContractOpen(false)
+      setEditFormErrors({})
       fetchAll()
     } catch (e) { toast({ title: 'خطأ', description: e.message, variant: 'error' }) }
     setSaving(false)
@@ -567,11 +579,11 @@ export default function ContractDetail() {
       />
 
       {/* Edit Contract Dialog */}
-      <Dialog open={editContractOpen} onOpenChange={setEditContractOpen}>
+      <Dialog open={editContractOpen} onOpenChange={(v) => { setEditContractOpen(v); if (!v) setEditFormErrors({}) }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>تعديل العقد</DialogTitle></DialogHeader>
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-            <FormField label="اللوحة الإعلانية">
+            <FormField label="اللوحة الإعلانية" error={editFormErrors.stand_id}>
               <Select value={editContractForm.stand_id} onValueChange={v => setEditContractForm({...editContractForm, stand_id: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -579,7 +591,7 @@ export default function ContractDetail() {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="العميل">
+            <FormField label="العميل" error={editFormErrors.client_id}>
               <Select value={editContractForm.client_id} onValueChange={v => setEditContractForm({...editContractForm, client_id: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -587,10 +599,10 @@ export default function ContractDetail() {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="تاريخ البداية">
+            <FormField label="تاريخ البداية" error={editFormErrors.start_date}>
               <DateInput value={editContractForm.start_date} onChange={e => { setEditContractForm({...editContractForm, start_date: e.target.value}); updateEndDate(e.target.value, editContractForm.duration_months, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
             </FormField>
-            <FormField label="مدة العقد (أشهر)">
+            <FormField label="مدة العقد (أشهر)" error={editFormErrors.duration_months}>
               <Input type="number" value={editContractForm.duration_months} min="1" onChange={e => { setEditContractForm({...editContractForm, duration_months: e.target.value}); updateEndDate(editContractForm.start_date, e.target.value, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
             </FormField>
             <FormField label="تاريخ النهاية">
@@ -606,7 +618,7 @@ export default function ContractDetail() {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="السعر الشهري (جنيه)">
+            <FormField label="السعر الشهري (جنيه)" error={editFormErrors.monthly_rate}>
               <Input type="number" value={editContractForm.monthly_rate} onChange={e => { setEditContractForm({...editContractForm, monthly_rate: e.target.value}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, e.target.value, editContractForm.payment_frequency) }} />
             </FormField>
             <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[editContractForm.payment_frequency]?.split('(')[0].trim() || '—'})`}>

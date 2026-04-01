@@ -1,5 +1,5 @@
 // Textarea
-import { forwardRef } from 'react'
+import { forwardRef, useEffect, useRef } from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import * as SeparatorPrimitive from '@radix-ui/react-separator'
 import { cn } from '@/lib/utils'
@@ -79,7 +79,13 @@ export function TableCaption({ className, ...props }) {
 }
 
 // ---- Tabs ----
-export const Tabs = TabsPrimitive.Root
+export function Tabs({ className, ...props }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) ref.current.dir = 'rtl'
+  }, [])
+  return <TabsPrimitive.Root ref={ref} dir="rtl" {...props} className={cn(className)} />
+}
 export function TabsList({ className, ...props }) {
   return (
     <TabsPrimitive.List
