@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Edit2, Save, X, Plus, Trash2, Building2, MapPin, Wrench, PlayCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import {
+  ArrowLeft, Edit2, Save, X, Plus, Trash2, Building2, MapPin,
+  Ruler, Clock, FileText, DollarSign, Wrench, PlayCircle,
+  ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, computeGovStatus, safeNum, cn, toLocalDateStr } from '@/lib/utils'
+import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -226,67 +230,131 @@ export default function StandDetail() {
 
   const govStatus = computeGovStatus(stand.gov_rental_end)
   const isRented = !!activeContract
-  const isStandActive = stand.is_active !== false // default true if undefined
+  const isStandActive = stand.is_active !== false
 
   return (
     <div className={cn('space-y-6 animate-fade-in', !isStandActive && 'opacity-75')}>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/stands')}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-foreground">{stand.code}</h1>
-            {!isStandActive && <Badge className="bg-muted text-muted-foreground border border-border text-xs">متوقف</Badge>}
-            <StatusBadge status={isRented ? 'rented' : 'available'} />
-            <StatusBadge status={govStatus} />
+
+      {/* ── Hero Header ─────────────────────────────────────── */}
+      <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm">
+        {stand.photo_url ? (
+          <div
+            className="h-44 sm:h-52 bg-cover bg-center relative"
+            style={{ backgroundImage: `url(${stand.photo_url})` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20" />
           </div>
-          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />{stand.address}
-          </p>
+        ) : (
+          <div className="h-28 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-b border-border/60" />
+        )}
+
+        <div className="relative -mt-14 px-6 pb-5 flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="w-20 h-20 rounded-2xl border-4 border-background bg-card text-primary flex items-center justify-center shadow-lg flex-shrink-0">
+            <Building2 className="w-9 h-9" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h1 className="text-2xl sm:text-3xl font-black text-foreground">{stand.code}</h1>
+              {!isStandActive && <Badge variant="muted" className="text-xs">متوقف</Badge>}
+              <StatusBadge status={isRented ? 'rented' : 'available'} />
+              <StatusBadge status={govStatus} />
+            </div>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+              <span className="truncate">{stand.address}</span>
+            </p>
+          </div>
+
+          <Button
+            size="sm"
+            variant={isStandActive ? 'outline' : 'default'}
+            onClick={toggleStandActive}
+            className={cn(
+              'gap-2 flex-shrink-0 font-medium shadow-sm',
+              isStandActive
+                ? 'border-muted text-muted-foreground hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive'
+                : 'bg-success hover:bg-success/90 text-white'
+            )}
+          >
+            {isStandActive
+              ? <><ToggleRight className="w-4 h-4" /> إيقاف</>
+              : <><ToggleLeft className="w-4 h-4" /> تفعيل</>}
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant={isStandActive ? 'outline' : 'default'}
-          onClick={toggleStandActive}
-          className={cn('gap-2', isStandActive ? 'text-muted-foreground border-muted' : 'bg-success hover:bg-success/90')}
-        >
-          {isStandActive
-            ? <><ToggleRight className="w-4 h-4" /> إيقاف</>
-            : <><ToggleLeft className="w-4 h-4" /> تفعيل</>}
-        </Button>
+
+        {/* Stats ribbon */}
+        <div className="px-6 pb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'الأبعاد', value: `${safeNum(stand.width)} × ${safeNum(stand.height)} م`, icon: Ruler, color: 'text-primary' },
+            { label: 'المساحة', value: `${safeNum(stand.width) * safeNum(stand.height)} م²`, icon: Building2, color: 'text-info' },
+            { label: 'الأوجه', value: stand.sides == 2 ? 'وجهين' : 'وجه واحد', icon: FileText, color: 'text-warning' },
+            { label: 'مستحق الآن', value: formatCurrency(periodDue), icon: DollarSign, color: periodDue > 0 ? 'text-destructive' : 'text-success' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60">
+              <Icon className={cn('w-5 h-5 flex-shrink-0', color)} />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground leading-tight">{label}</p>
+                <p className={cn('text-sm font-bold leading-tight truncate', color)}>{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <Tabs defaultValue="info">
-        <TabsList className="flex-wrap h-auto gap-1 w-full sm:w-auto">
-          <TabsTrigger value="info">المعلومات</TabsTrigger>
-          <TabsTrigger value="gov">الترخيص الحكومي</TabsTrigger>
-          <TabsTrigger value="contract">العقد الحالي</TabsTrigger>
-          <TabsTrigger value="history">سجل العقود</TabsTrigger>
-          <TabsTrigger value="maintenance">الصيانة</TabsTrigger>
-          <TabsTrigger value="revenue">الإيرادات</TabsTrigger>
-        </TabsList>
+      {/* ── Tab Navigation ──────────────────────────────────── */}
+      <div className="bg-card rounded-2xl border border-border shadow-sm px-3 py-2">
+        <Tabs defaultValue="info">
+          <TabsList className="w-full h-auto gap-1 bg-transparent flex-wrap justify-start">
+            {[
+              { value: 'info',        label: 'المعلومات',       icon: Building2 },
+              { value: 'gov',        label: 'الترخيص',          icon: Shield },
+              { value: 'contract',   label: 'العقد الحالي',     icon: FileText },
+              { value: 'history',    label: 'سجل العقود',       icon: History },
+              { value: 'maintenance', label: 'الصيانة',          icon: Wrench },
+              { value: 'revenue',     label: 'الإيرادات',         icon: BarChart3 },
+            ].map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="gap-2 text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none font-medium px-3 py-2 rounded-xl transition-colors"
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
         {/* Tab: Basic Info */}
-        <TabsContent value="info">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>المعلومات الأساسية</CardTitle>
+        <TabsContent value="info" className="mt-6 space-y-4">
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-primary" />
+                </div>
+                <CardTitle className="text-base">المعلومات الأساسية</CardTitle>
+              </div>
               {!editingInfo ? (
-                <Button size="sm" variant="outline" onClick={() => setEditingInfo(true)}>
+                <Button size="sm" variant="ghost" onClick={() => setEditingInfo(true)} className="gap-2 text-primary hover:text-primary">
                   <Edit2 className="w-4 h-4" /> تعديل
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={saveInfo} disabled={saving}><Save className="w-4 h-4" /> حفظ</Button>
+                  <Button size="sm" onClick={saveInfo} disabled={saving} className="gap-1"><Save className="w-4 h-4" /> حفظ</Button>
                   <Button size="sm" variant="outline" onClick={() => setEditingInfo(false)}><X className="w-4 h-4" /></Button>
                 </div>
               )}
             </CardHeader>
             <CardContent className="space-y-4">
               {stand.photo_url && !editingInfo && (
-                <img src={stand.photo_url} alt={stand.code} className="w-full max-w-sm h-52 object-cover rounded-xl border border-border" />
+                <div className="relative rounded-xl overflow-hidden border border-border group">
+                  <img src={stand.photo_url} alt={stand.code} className="w-full h-56 object-cover" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                  </div>
+                </div>
               )}
               {editingInfo ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -307,21 +375,25 @@ export default function StandDetail() {
                   <FormField label="صورة جديدة" className="sm:col-span-2"><Input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} /></FormField>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {[['الكود', stand.code], ['الطول', `${stand.width} م`], ['العرض', `${stand.height} م`], ['المساحة', `${safeNum(stand.width) * safeNum(stand.height)} م²`], ['الأوجه', stand.sides == 2 ? 'وجهين' : 'وجه واحد']].map(([k,v]) => (
-                      <div key={k}>
-                        <p className="text-xs text-muted-foreground">{k}</p>
-                        <p className="font-semibold text-foreground">{v}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {stand.desc && (
-                    <div className="border-t border-border pt-4">
-                      <p className="text-sm text-muted-foreground mb-2">الوصف</p>
-                      <p className="text-foreground whitespace-pre-wrap">{stand.desc}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    ['الكود', stand.code, 'text-primary font-black text-lg'],
+                    ['الطول', `${stand.width} م`, 'text-foreground'],
+                    ['العرض', `${stand.height} م`, 'text-foreground'],
+                    ['المساحة', `${safeNum(stand.width) * safeNum(stand.height)} م²`, 'text-info font-bold'],
+                    ['الأوجه', stand.sides == 2 ? 'وجهين' : 'وجه واحد', 'text-warning font-bold'],
+                  ].map(([k, v, cls]) => (
+                    <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                      <p className="text-xs text-muted-foreground mb-1">{k}</p>
+                      <p className={cn('font-bold', cls)}>{v}</p>
                     </div>
-                  )}
+                  ))}
+                </div>
+              )}
+              {stand.desc && !editingInfo && (
+                <div className="border-t border-border/60 pt-4">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">الوصف</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap bg-muted/40 rounded-xl px-4 py-3 border border-border/60">{stand.desc}</p>
                 </div>
               )}
             </CardContent>
@@ -329,15 +401,23 @@ export default function StandDetail() {
         </TabsContent>
 
         {/* Tab: Gov Permit */}
-        <TabsContent value="gov">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>الترخيص الحكومي</CardTitle>
+        <TabsContent value="gov" className="mt-6">
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-warning" />
+                </div>
+                <CardTitle className="text-base">الترخيص الحكومي</CardTitle>
+              </div>
               {!editingGov ? (
-                <Button size="sm" variant="outline" onClick={() => setEditingGov(true)}><Edit2 className="w-4 h-4" /> تعديل</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingGov(true)} className="gap-2 text-warning hover:text-warning">
+                  <Edit2 className="w-4 h-4" /> تعديل
+                </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={saveGov} disabled={saving}><Save className="w-4 h-4" /> حفظ</Button>
+                  <Button size="sm" onClick={saveGov} disabled={saving} className="gap-1"><Save className="w-4 h-4" /> حفظ</Button>
                   <Button size="sm" variant="outline" onClick={() => setEditingGov(false)}><X className="w-4 h-4" /></Button>
                 </div>
               )}
@@ -351,20 +431,20 @@ export default function StandDetail() {
                   <FormField label="التكلفة (جنيه)"><Input type="number" value={govForm.gov_rental_cost} onChange={e => setGovForm({...govForm, gov_rental_cost: e.target.value})} /></FormField>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    ['رقم الترخيص', stand.gov_license_number || '—'],
-                    ['تاريخ البداية', formatDate(stand.gov_rental_start)],
-                    ['تاريخ الانتهاء', formatDate(stand.gov_rental_end)],
-                    ['التكلفة', formatCurrency(stand.gov_rental_cost)],
-                  ].map(([k,v]) => (
-                    <div key={k}>
-                      <p className="text-xs text-muted-foreground">{k}</p>
-                      <p className="font-semibold text-foreground mt-0.5">{v}</p>
+                    ['رقم الترخيص', stand.gov_license_number || '—', 'text-foreground'],
+                    ['تاريخ البداية', formatDate(stand.gov_rental_start), 'text-foreground'],
+                    ['تاريخ الانتهاء', formatDate(stand.gov_rental_end), stand.gov_rental_end && new Date(stand.gov_rental_end) < new Date() ? 'text-destructive font-bold' : 'text-foreground'],
+                    ['التكلفة', formatCurrency(stand.gov_rental_cost), 'text-success font-bold'],
+                  ].map(([k, v, cls]) => (
+                    <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                      <p className="text-xs text-muted-foreground mb-1">{k}</p>
+                      <p className={cn('font-bold text-sm', cls)}>{v}</p>
                     </div>
                   ))}
-                  <div>
-                    <p className="text-xs text-muted-foreground">الحالة</p>
+                  <div className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                    <p className="text-xs text-muted-foreground mb-1">الحالة</p>
                     <p className="mt-0.5"><StatusBadge status={govStatus} /></p>
                   </div>
                 </div>
@@ -374,52 +454,79 @@ export default function StandDetail() {
         </TabsContent>
 
         {/* Tab: Active Contract */}
-        <TabsContent value="contract">
+        <TabsContent value="contract" className="mt-6 space-y-4">
           {!activeContract ? (
             <Card>
-              <CardContent className="py-12 text-center">
-                <Building2 className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground mb-4">لا يوجد عقد نشط لهذه اللوحة</p>
-                <Button onClick={() => navigate(`/contracts?stand=${id}`)}>
+              <CardContent className="py-16 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-muted-foreground/40" />
+                </div>
+                <p className="text-muted-foreground mb-5 font-medium">لا يوجد عقد نشط لهذه اللوحة</p>
+                <Button onClick={() => navigate(`/contracts?stand=${id}`)} className="gap-2">
                   <Plus className="w-4 h-4" /> إنشاء عقد جديد
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>العقد الحالي</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {[
-                    ['العميل', activeContract.clients?.name],
-                    ['الهاتف', activeContract.clients?.phone],
-                    ['تاريخ البداية', formatDate(activeContract.start_date)],
-                    ['تاريخ الانتهاء', formatDate(activeContract.end_date)],
-                    ['قيمة العقد', formatCurrency(activeContract.total_value)],
-                    ['المدفوع', formatCurrency(contractPaid(activeContract))],
-                    ['مستحق الآن', formatCurrency(periodDue)],
-                    ['مدة العقد', `${activeContract.duration_months || '—'} شهر`],
-                  ].map(([k, v]) => (
-                    <div key={k}>
-                      <p className="text-xs text-muted-foreground">{k}</p>
-                      <p className={`font-semibold text-foreground ${k === 'مستحق الآن' && periodDue > 0 ? 'text-destructive' : ''}`}>{v || '—'}</p>
+            <>
+              <Card className="overflow-hidden">
+                <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-success" />
                     </div>
-                  ))}
-                </div>
-                <Button variant="outline" size="sm" onClick={() => navigate(`/contracts/${activeContract.id}`)}>
-                  عرض تفاصيل العقد الكاملة
-                </Button>
-              </CardContent>
-            </Card>
+                    <CardTitle className="text-base">العقد الحالي</CardTitle>
+                    <StatusBadge status="active" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Client banner */}
+                  <div className="bg-primary/5 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 border border-primary/15">
+                    <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-black text-lg flex-shrink-0">
+                      {activeContract.clients?.name?.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-foreground">{activeContract.clients?.name}</p>
+                      <p className="text-xs text-muted-foreground">{activeContract.clients?.phone}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/contracts/${activeContract.id}`)} className="gap-1 text-xs">
+                      التفاصيل <ChevronRight className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      ['تاريخ البداية', formatDate(activeContract.start_date), 'text-foreground'],
+                      ['تاريخ الانتهاء', formatDate(activeContract.end_date), activeContract.end_date && new Date(activeContract.end_date) < new Date() ? 'text-destructive' : 'text-foreground'],
+                      ['قيمة العقد', formatCurrency(activeContract.total_value), 'text-primary font-black'],
+                      ['المدفوع', formatCurrency(contractPaid(activeContract)), 'text-success font-bold'],
+                      ['مستحق الآن', formatCurrency(periodDue), periodDue > 0 ? 'text-destructive font-black' : 'text-success font-bold'],
+                      ['مدة العقد', `${activeContract.duration_months || '—'} شهر`, 'text-foreground'],
+                    ].map(([k, v, cls]) => (
+                      <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                        <p className="text-xs text-muted-foreground mb-1">{k}</p>
+                        <p className={cn('font-bold text-sm', cls)}>{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
           {upcomingContracts.length > 0 && (
-            <Card className="mt-4">
-              <CardHeader><CardTitle>العقود القادمة ({upcomingContracts.length})</CardTitle></CardHeader>
+            <Card className="overflow-hidden">
+              <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-info" />
+                  </div>
+                  <CardTitle className="text-base">العقود القادمة ({upcomingContracts.length})</CardTitle>
+                </div>
+              </CardHeader>
               <CardContent>
                 {upcomingContracts.map(c => {
-                  // Find the contract that would be the "previous" one (non-terminated, ends before or at upcoming start)
                   const prevContract = contracts.find(c2 =>
                     c2.id !== c.id &&
                     c2.status !== 'terminated' &&
@@ -428,33 +535,35 @@ export default function StandDetail() {
                   )
                   const prevActive = prevContract && prevContract.status === 'active'
                   return (
-                    <div key={c.id} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted transition-colors text-start border border-border mb-2">
+                    <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors text-start border border-border/60 mb-2 last:mb-0 group">
+                      <div className="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center font-black flex-shrink-0">
+                        {c.clients?.name?.charAt(0)}
+                      </div>
                       <button className="flex-1 text-start" onClick={() => navigate(`/contracts/${c.id}`)}>
-                        <p className="font-medium text-sm">{c.clients?.name}</p>
+                        <p className="font-bold text-sm text-foreground">{c.clients?.name}</p>
                         <p className="text-xs text-muted-foreground">{formatDate(c.start_date)} — {formatDate(c.end_date)}</p>
                       </button>
-                      <div className="flex items-center gap-2 me-3">
-                        <StatusBadge status="upcoming" />
-                        <Button
-                          size="icon-sm"
-                          variant="outline"
-                          title={prevActive ? 'لا يمكن التفعيل — العقد السابق لا يزال نشطاً' : 'تفعيل العقد الآن'}
-                          disabled={prevActive}
-                          onClick={async () => {
-                            if (prevActive) return
-                            const today = toLocalDateStr(new Date())
-                            const { error } = await supabase.from('contracts').update({ status: 'active', start_date: today }).eq('id', c.id)
-                            if (!error) {
-                              toast({ title: 'تم تفعيل العقد', description: `يبدأ من ${today}`, variant: 'success' })
-                              fetchAll()
-                            } else {
-                              toast({ title: 'خطأ', description: error.message, variant: 'error' })
-                            }
-                          }}
-                        >
-                          <PlayCircle className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <StatusBadge status="upcoming" />
+                      <Button
+                        size="icon-sm"
+                        variant="outline"
+                        title={prevActive ? 'لا يمكن التفعيل — العقد السابق لا يزال نشطاً' : 'تفعيل العقد الآن'}
+                        disabled={prevActive}
+                        onClick={async () => {
+                          if (prevActive) return
+                          const today = toLocalDateStr(new Date())
+                          const { error } = await supabase.from('contracts').update({ status: 'active', start_date: today }).eq('id', c.id)
+                          if (!error) {
+                            toast({ title: 'تم تفعيل العقد', description: `يبدأ من ${today}`, variant: 'success' })
+                            fetchAll()
+                          } else {
+                            toast({ title: 'خطأ', description: error.message, variant: 'error' })
+                          }
+                        }}
+                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <PlayCircle className="w-4 h-4 text-success" />
+                      </Button>
                     </div>
                   )
                 })}
@@ -464,16 +573,24 @@ export default function StandDetail() {
         </TabsContent>
 
         {/* Tab: History */}
-        <TabsContent value="history">
-          <Card>
-            <CardHeader><CardTitle>سجل جميع العقود</CardTitle></CardHeader>
+        <TabsContent value="history" className="mt-6">
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-muted-foreground/30 via-muted-foreground/10 to-transparent" />
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                  <History className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <CardTitle className="text-base">سجل جميع العقود ({contracts.length})</CardTitle>
+              </div>
+            </CardHeader>
             <CardContent>
               {contracts.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">لا توجد عقود سابقة</p>
+                <p className="text-center text-muted-foreground py-10 font-medium">لا توجد عقود سابقة</p>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>العميل</TableHead>
                       <TableHead>البداية</TableHead>
                       <TableHead>النهاية</TableHead>
@@ -483,11 +600,18 @@ export default function StandDetail() {
                   </TableHeader>
                   <TableBody>
                     {contracts.map(c => (
-                      <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
-                        <TableCell className="font-medium">{c.clients?.name}</TableCell>
-                        <TableCell>{formatDate(c.start_date)}</TableCell>
-                        <TableCell>{formatDate(c.end_date)}</TableCell>
-                        <TableCell>{formatCurrency(c.total_value)}</TableCell>
+                      <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate(`/contracts/${c.id}`)}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs flex-shrink-0">
+                              {c.clients?.name?.charAt(0)}
+                            </div>
+                            <span className="font-medium">{c.clients?.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{formatDate(c.start_date)}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{formatDate(c.end_date)}</TableCell>
+                        <TableCell className="font-bold text-sm">{formatCurrency(c.total_value)}</TableCell>
                         <TableCell><StatusBadge status={c.status} /></TableCell>
                       </TableRow>
                     ))}
@@ -499,77 +623,106 @@ export default function StandDetail() {
         </TabsContent>
 
         {/* Tab: Maintenance */}
-        <TabsContent value="maintenance">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="bg-warning/10 border border-warning/30 rounded-xl px-4 py-2 text-sm">
-                <span className="text-muted-foreground">تكلفة الصيانة (6 أشهر): </span>
-                <span className="font-bold text-warning">{formatCurrency(recentMaintCost)}</span>
+        <TabsContent value="maintenance" className="mt-6 space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="bg-warning/10 border border-warning/25 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-warning" />
+                <span className="text-xs text-muted-foreground">تكلفة الصيانة (6 أشهر):</span>
+                <span className="font-black text-warning text-sm">{formatCurrency(recentMaintCost)}</span>
               </div>
-              <Button size="sm" onClick={() => setMaintDialogOpen(true)}>
-                <Plus className="w-4 h-4" /> إضافة صيانة
-              </Button>
             </div>
-            <Card>
-              <CardContent className="pt-4">
-                {maintenance.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">لا توجد سجلات صيانة</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>الوصف</TableHead>
-                        <TableHead>الفني</TableHead>
-                        <TableHead>التكلفة</TableHead>
-                        <TableHead>مدفوع</TableHead>
-                        <TableHead className="text-end">الإجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {maintenance.map(m => (
-                        <TableRow key={m.id}>
-                          <TableCell>{formatDate(m.date)}</TableCell>
-                          <TableCell className="max-w-[180px] truncate">{m.description}</TableCell>
-                          <TableCell>{m.technician_name || '—'}</TableCell>
-                          <TableCell>{formatCurrency(m.cost)}</TableCell>
-                          <TableCell>
-                            <button onClick={() => toggleMaintPaid(m)} className={`text-xs px-2 py-1 rounded-full border font-medium transition-colors ${m.is_paid ? 'bg-success/15 text-success border-success/30' : 'bg-destructive/15 text-destructive border-destructive/30'}`}>
-                              {m.is_paid ? 'مدفوع' : 'غير مدفوع'}
-                            </button>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 justify-end">
-                              <Button size="icon-sm" variant="ghost" onClick={() => openEditMaint(m)} title="تعديل" className="text-primary hover:text-primary">
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button size="icon-sm" variant="ghost" onClick={() => setDeleteConfirm(m.id)} className="text-destructive hover:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+            <Button size="sm" onClick={() => setMaintDialogOpen(true)} className="gap-2 bg-primary hover:bg-primary/90">
+              <Plus className="w-4 h-4" /> إضافة صيانة
+            </Button>
           </div>
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
+            <CardContent className="pt-4">
+              {maintenance.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">
+                    <Wrench className="w-7 h-7 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">لا توجد سجلات صيانة</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>التاريخ</TableHead>
+                      <TableHead>الوصف</TableHead>
+                      <TableHead>الفني</TableHead>
+                      <TableHead>التكلفة</TableHead>
+                      <TableHead>حالة الدفع</TableHead>
+                      <TableHead className="text-end">إجراءات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {maintenance.map(m => (
+                      <TableRow key={m.id} className="hover:bg-muted/40 transition-colors">
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(m.date)}</TableCell>
+                        <TableCell className="max-w-[160px] truncate text-sm">{m.description}</TableCell>
+                        <TableCell className="text-sm">
+                          {m.technician_name
+                            ? <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-muted-foreground" />{m.technician_name}</span>
+                            : <span className="text-muted-foreground/50">—</span>}
+                        </TableCell>
+                        <TableCell className="font-bold text-sm">{formatCurrency(m.cost)}</TableCell>
+                        <TableCell>
+                          <button
+                            onClick={() => toggleMaintPaid(m)}
+                            className={cn(
+                              'text-xs px-2.5 py-1 rounded-full border font-medium transition-all cursor-pointer',
+                              m.is_paid
+                                ? 'bg-success/10 text-success border-success/25 hover:bg-success/20'
+                                : 'bg-destructive/10 text-destructive border-destructive/25 hover:bg-destructive/20'
+                            )}
+                          >
+                            {m.is_paid ? '✓ مدفوع' : '✗ غير مدفوع'}
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button size="icon-sm" variant="ghost" onClick={() => openEditMaint(m)} title="تعديل" className="text-muted-foreground hover:text-primary">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon-sm" variant="ghost" onClick={() => setDeleteConfirm(m.id)} className="text-muted-foreground hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tab: Revenue */}
-        <TabsContent value="revenue">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard title="الإيرادات (6 أشهر)" value={formatCurrency(recentRevenue)} icon={Building2} variant="success" />
-            <StatCard title="إجمالي العقود" value={contracts.length} icon={Building2} variant="default" />
+        <TabsContent value="revenue" className="mt-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard title="الإيرادات (6 أشهر)" value={formatCurrency(recentRevenue)} icon={BarChart3} variant="success" />
+            <StatCard title="إجمالي العقود" value={contracts.length} icon={FileText} variant="info" />
+            <StatCard title="إجمالي المدفوع" value={formatCurrency(contracts.reduce((a, c) => a + contractPaid(c), 0))} icon={DollarSign} variant="default" />
+            <StatCard title="إجمالي مستحق" value={formatCurrency(contracts.reduce((a, c) => a + Math.max(0, safeNum(c.total_value) - contractPaid(c)), 0))} icon={Clock} variant={recentRevenue > 0 ? 'danger' : 'warning'} />
           </div>
-          <Card className="mt-4">
-            <CardHeader><CardTitle>تفاصيل المدفوعات</CardTitle></CardHeader>
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-success" />
+                </div>
+                <CardTitle className="text-base">تفاصيل المدفوعات</CardTitle>
+              </div>
+            </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>العميل</TableHead>
                     <TableHead>قيمة العقد</TableHead>
                     <TableHead>المدفوع</TableHead>
@@ -584,12 +737,33 @@ export default function StandDetail() {
                     const hasOwed = owed > 0
                     const hasCredit = credit > 0
                     return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.clients?.name}</TableCell>
-                        <TableCell>{formatCurrency(c.total_value)}</TableCell>
-                        <TableCell className={hasOwed ? 'text-destructive' : 'text-success'}>{formatCurrency(paid)}</TableCell>
-                        <TableCell className={hasOwed ? 'text-destructive font-medium' : 'text-success font-medium'}>
-                          {hasOwed ? `عليه: ${formatCurrency(owed)}` : hasCredit ? `له: ${formatCurrency(credit)}` : '—'}
+                      <TableRow key={c.id} className="hover:bg-muted/40 transition-colors">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs flex-shrink-0">
+                              {c.clients?.name?.charAt(0)}
+                            </div>
+                            <span className="font-medium">{c.clients?.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-bold text-sm">{formatCurrency(c.total_value)}</TableCell>
+                        <TableCell className={hasOwed ? 'text-destructive font-bold' : 'text-success font-bold text-sm'}>
+                          {formatCurrency(paid)}
+                        </TableCell>
+                        <TableCell>
+                          {hasOwed ? (
+                            <span className="inline-flex items-center gap-1 text-destructive font-bold text-sm">
+                              <span className="text-xs bg-destructive/10 border border-destructive/25 px-1.5 py-0.5 rounded">عليه</span>
+                              {formatCurrency(owed)}
+                            </span>
+                          ) : hasCredit ? (
+                            <span className="inline-flex items-center gap-1 text-success font-bold text-sm">
+                              <span className="text-xs bg-success/10 border border-success/25 px-1.5 py-0.5 rounded">له</span>
+                              {formatCurrency(credit)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">متكافئ</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     )
@@ -671,6 +845,7 @@ export default function StandDetail() {
         confirmText="حذف"
         onConfirm={() => deleteMaint(deleteConfirm)}
       />
+    </div>
     </div>
   )
 }
