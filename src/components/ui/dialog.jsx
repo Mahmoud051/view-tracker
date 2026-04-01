@@ -56,7 +56,7 @@ function DialogHeader({ className, ...props }) {
 function DialogFooter({ className, ...props }) {
   return (
     <div
-      className={cn('flex items-center justify-start gap-3 p-6 pt-4 border-t border-border', className)}
+      className={cn('flex items-center justify-end gap-3 p-6 pt-4 border-t border-border', className)}
       {...props}
     />
   )

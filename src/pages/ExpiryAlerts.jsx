@@ -105,7 +105,7 @@ export default function ExpiryAlerts() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-warning">
+            <CardTitle className="flex flex-row-reverse items-center gap-2 text-warning">
               <AlertTriangle className="w-5 h-5" />
               التراخيص الحكومية المنتهية قريباً
               {govAlerts.length > 0 && (
@@ -171,7 +171,7 @@ export default function ExpiryAlerts() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-destructive">
+            <CardTitle className="flex flex-row-reverse items-center gap-2 text-destructive">
               <Calendar className="w-5 h-5" />
               عقود العملاء المنتهية قريباً
               {contractAlerts.length > 0 && (

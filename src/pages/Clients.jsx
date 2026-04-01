@@ -124,8 +124,8 @@ export default function Clients() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)} className="pe-9" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9" />
       </div>
 
       {filtered.length === 0 ? (
@@ -179,7 +179,7 @@ export default function Clients() {
                 {(stats.periodDue > 0 || stats.owed > 0) && (
                   <div className="flex items-center gap-2 py-2 border-t border-border ">
                     {stats.periodDue > 0 && (
-                      <div className="flex items-center gap-1 text-destructive ps-1">
+                      <div className="flex items-center gap-1 text-destructive pe-1">
                         <Calendar className="w-3 h-3" />
                         <span className="text-xs font-medium">مستحق: {formatCurrency(stats.periodDue).replace(' جنيه', '')}</span>
                       </div>
@@ -195,7 +195,7 @@ export default function Clients() {
 
                 {/* Nearest contract */}
                 {stats.nearestContract && (
-                  <div className="flex items-center gap-2 py-2 border-t border-border ps-1">
+                  <div className="flex items-center gap-2 py-2 border-t border-border pe-1">
                     <Building2 className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-foreground truncate">{stats.nearestContract.stands?.code} — {stats.nearestContract.stands?.address}</p>
@@ -224,9 +224,9 @@ export default function Clients() {
               <Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="01x xxxx xxxx" dir="ltr" />
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'حفظ...' : 'إضافة عميل'}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? 'حفظ...' : 'إضافة عميل'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

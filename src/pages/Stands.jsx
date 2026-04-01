@@ -124,12 +124,12 @@ export default function Stands() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="بحث بالكود أو العنوان..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pe-9"
+            className="ps-9"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -301,11 +301,11 @@ export default function Stands() {
               <DateInput value={form.gov_rental_end} onChange={e => setForm({ ...form, gov_rental_end: e.target.value })} />
             </FormField>
           </div>
-          <DialogFooter>
+          <DialogFooter className="justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'جاري الحفظ...' : 'حفظ اللوحة'}
             </Button>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

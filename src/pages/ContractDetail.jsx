@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
+import { ArrowRight, ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -352,7 +352,7 @@ export default function ContractDetail() {
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate('/contracts')}>
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowRight className="w-4 h-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
@@ -441,7 +441,7 @@ export default function ContractDetail() {
       {/* Payments */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex flex-row-reverse items-center gap-2">
             <CreditCard className="w-5 h-5 text-primary" />
             سجل المدفوعات
           </CardTitle>
@@ -532,9 +532,9 @@ export default function ContractDetail() {
               <Textarea value={paymentForm.notes} onChange={e => setPaymentForm({...paymentForm, notes: e.target.value})} rows={2} />
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={editingPayment ? saveEditedPayment : addPayment} disabled={saving}>{saving ? 'حفظ...' : (editingPayment ? 'تحديث الدفعة' : 'إضافة الدفعة')}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => { setPaymentDialogOpen(false); setEditingPayment(null); setPaymentForm(EMPTY_PAYMENT) }}>إلغاء</Button>
+            <Button onClick={editingPayment ? saveEditedPayment : addPayment} disabled={saving}>{saving ? 'حفظ...' : (editingPayment ? 'تحديث الدفعة' : 'إضافة الدفعة')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -619,9 +619,9 @@ export default function ContractDetail() {
               <Textarea value={editContractForm.notes} onChange={e => setEditContractForm({...editContractForm, notes: e.target.value})} rows={3} />
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={saveEditedContract} disabled={saving}>{saving ? 'حفظ...' : 'تحديث العقد'}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => setEditContractOpen(false)}>إلغاء</Button>
+            <Button onClick={saveEditedContract} disabled={saving}>{saving ? 'حفظ...' : 'تحديث العقد'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

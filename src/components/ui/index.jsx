@@ -26,7 +26,7 @@ Textarea.displayName = 'Textarea'
 // ---- Table ----
 export function Table({ className, ...props }) {
   return (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full overflow-auto" dir="rtl">
       <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   )

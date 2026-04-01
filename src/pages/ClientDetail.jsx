@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit2, Save, X, Phone, FileText } from 'lucide-react'
+import { ArrowRight, Edit2, Save, X, Phone, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatCurrency, safeNum, computeContractStatus } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -90,7 +90,7 @@ export default function ClientDetail() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowRight className="w-4 h-4" />
         </Button>
         <div className="flex-1 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center text-xl font-black">

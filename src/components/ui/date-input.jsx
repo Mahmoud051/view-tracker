@@ -1,28 +1,50 @@
-import { forwardRef } from 'react'
+import { forwardRef, useRef } from 'react'
 import { Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const DateInput = forwardRef(({ className, ...props }, ref) => {
+const DateInput = forwardRef(({ className, value, onChange, ...props }, ref) => {
+  const inputRef = useRef(null)
+
+  // Format yyyy-mm-dd → yyyy/mm/dd for display
+  const displayValue = value
+    ? value.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1/$2/$3')
+    : ''
+
+  function openPicker() {
+    inputRef.current?.showPicker?.()
+  }
+
   return (
-    <div className="relative inline-flex items-center">
+    <div
+      className={cn(
+        'relative inline-flex items-center cursor-pointer',
+        'rounded-lg border border-input bg-background',
+        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        'transition-colors duration-200',
+        className
+      )}
+      onClick={openPicker}
+    >
+      {/* Native date input (invisible, handles all picker interaction) */}
       <input
         type="date"
-        className={cn(
-          'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm pr-10',
-          'ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium',
-          'placeholder:text-muted-foreground',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'transition-colors duration-200',
-          // Hide native calendar icon
-          '[&::-webkit-calendar-picker-indicator]:hidden',
-          '[&::-moz-calendar-picker-indicator]:hidden',
-          className
-        )}
-        ref={ref}
+        ref={inputRef}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        dir="rtl"
+        value={value || ''}
+        onChange={(e) => onChange && onChange(e)}
+        onClick={(e) => e.stopPropagation()}
         {...props}
       />
-      <Calendar className="absolute right-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+      {/* Formatted display */}
+      <span
+        className="flex h-10 items-center px-3 pl-10 text-sm w-full text-right"
+        dir="rtl"
+      >
+        {displayValue || <span className="text-muted-foreground">{props.placeholder || ''}</span>}
+      </span>
+      <Calendar className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
     </div>
   )
 })

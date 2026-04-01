@@ -76,7 +76,7 @@ function StandSearchSelect({ stands, value, onChange, error }) {
       {open && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="relative p-2 border-b border-border">
-            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               autoFocus
               value={search}
@@ -154,7 +154,7 @@ function ClientSearchSelect({ clients, value, onChange, onAddNew }) {
       {open && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="relative p-2 border-b border-border">
-            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               autoFocus
               value={search}
@@ -301,6 +301,11 @@ export default function Contracts() {
       errs.start_date = `يجب أن يكون بعد أو مساوياً لتاريخ انتهاء العقد السابق (${formatDate(form.previous_end_date)})`
     }
     if (!form.duration_months || isNaN(form.duration_months) || parseInt(form.duration_months) < 1) errs.duration_months = 'مدة العقد مطلوبة (أشهر)'
+    const interval = INTERVAL_MONTHS[form.payment_interval] || 1
+    const months = parseInt(form.duration_months)
+    if (!errs.duration_months && months % interval !== 0) {
+      errs.duration_months = `المدة يجب أن تكون مضاعفات لـ ${interval} شهر (مثلاً: ${interval}، ${interval * 2}، ${interval * 3}...)`
+    }
     if (!form.monthly_rate || isNaN(form.monthly_rate) || parseFloat(form.monthly_rate) <= 0) errs.monthly_rate = 'السعر الشهري مطلوب'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
@@ -392,8 +397,8 @@ export default function Contracts() {
           ))}
         </div>
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} className="pe-9 h-8 text-xs" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9 h-8 text-xs" />
         </div>
       </div>
 
@@ -513,6 +518,11 @@ export default function Contracts() {
                 onChange={e => onFormChange('duration_months', e.target.value)}
                 placeholder="مثال: 12"
               />
+              {form.duration_months > 0 && (parseInt(form.duration_months) % intervalMonths) !== 0 && (
+                <p className="text-xs text-warning mt-1">
+                  ⚠ المدة ({form.duration_months} شهر) لا تتوافق مع فترة الدفع ({intervalMonths} شهر) — لن تكفي الدفعات لتغطية كامل المدة
+                </p>
+              )}
             </FormField>
             <FormField label="تاريخ النهاية">
               <DateInput value={form.end_date} readOnly className="bg-muted cursor-not-allowed" />
@@ -560,9 +570,9 @@ export default function Contracts() {
               <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="ملاحظات اختيارية..." rows={3} />
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'جاري الحفظ...' : 'إنشاء العقد'}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? 'جاري الحفظ...' : 'إنشاء العقد'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -575,9 +585,9 @@ export default function Contracts() {
             <FormField label="الاسم" required><Input value={clientForm.name} onChange={e => setClientForm({...clientForm, name: e.target.value})} /></FormField>
             <FormField label="الهاتف"><Input value={clientForm.phone} onChange={e => setClientForm({...clientForm, phone: e.target.value})} dir="ltr" /></FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={saveClient}>إضافة</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => setClientDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={saveClient}>إضافة</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

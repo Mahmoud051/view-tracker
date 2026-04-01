@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Edit2, Save, X, Plus, Trash2, Building2, MapPin,
+   Edit2, Save, X, Plus, Trash2, Building2, MapPin,
   Ruler, Clock, FileText, DollarSign, Wrench, PlayCircle,
   ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight
 } from 'lucide-react'
@@ -330,7 +330,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-row-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Building2 className="w-4 h-4 text-primary" />
                 </div>
@@ -405,7 +405,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-row-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-warning" />
                 </div>
@@ -472,7 +472,7 @@ export default function StandDetail() {
               <Card className="overflow-hidden">
                 <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
                 <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-row-reverse items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                       <FileText className="w-4 h-4 text-success" />
                     </div>
@@ -518,7 +518,7 @@ export default function StandDetail() {
             <Card className="overflow-hidden">
               <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
               <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-row-reverse items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
                     <Clock className="w-4 h-4 text-info" />
                   </div>
@@ -577,7 +577,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-muted-foreground/30 via-muted-foreground/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-row-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                   <History className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -712,7 +712,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-row-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-success" />
                 </div>
@@ -799,9 +799,9 @@ export default function StandDetail() {
               </div>
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={saveMaint} disabled={saving}>{saving ? 'حفظ...' : 'إضافة'}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => setMaintDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={saveMaint} disabled={saving}>{saving ? 'حفظ...' : 'إضافة'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -830,9 +830,9 @@ export default function StandDetail() {
               </div>
             </FormField>
           </div>
-          <DialogFooter>
-            <Button onClick={saveEditedMaint} disabled={saving}>{saving ? 'حفظ...' : 'تحديث'}</Button>
+          <DialogFooter className="justify-end">
             <Button variant="outline" onClick={() => { setEditingMaintId(null); setEditingMaintForm({ date: '', description: '', cost: '', technician_name: '', is_paid: false }) }}>إلغاء</Button>
+            <Button onClick={saveEditedMaint} disabled={saving}>{saving ? 'حفظ...' : 'تحديث'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

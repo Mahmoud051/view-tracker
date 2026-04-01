@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -6,26 +7,29 @@ const Select = SelectPrimitive.Root
 const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
 
-function SelectTrigger({ className, children, ...props }) {
+const SelectTrigger = forwardRef(({ className, children, ...props }, ref) => {
   return (
     <SelectPrimitive.Trigger
+      ref={ref}
+      dir="rtl"
       className={cn(
         'flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm',
         'ring-offset-background placeholder:text-muted-foreground',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-        'disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+        'disabled:cursor-not-allowed disabled:opacity-50',
         'transition-colors duration-200',
         className
       )}
       {...props}
     >
-      {children}
+      <SelectPrimitive.Value className="flex-1 min-w-0 [&>span]:w-full" />
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 me-auto" />
+        <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 me-2" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
-}
+})
+SelectTrigger.displayName = 'SelectTrigger'
 
 function SelectScrollUpButton({ className, ...props }) {
   return (
@@ -53,6 +57,7 @@ function SelectContent({ className, children, position = 'popper', ...props }) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        dir="rtl"
         className={cn(
           'relative z-[60] max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -82,7 +87,7 @@ function SelectContent({ className, children, position = 'popper', ...props }) {
 function SelectLabel({ className, ...props }) {
   return (
     <SelectPrimitive.Label
-      className={cn('py-1.5 ps-8 pe-2 text-sm font-semibold text-muted-foreground', className)}
+      className={cn('py-1.5 ps-2 pe-8 text-sm font-semibold text-muted-foreground', className)}
       {...props}
     />
   )
@@ -92,7 +97,7 @@ function SelectItem({ className, children, ...props }) {
   return (
     <SelectPrimitive.Item
       className={cn(
-        'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none',
+        'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 ps-2 pe-8 text-sm outline-none',
         'focus:bg-secondary focus:text-secondary-foreground',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className
