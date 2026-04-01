@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, Download, AlertTriangle, Calendar } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, daysRemaining, safeNum, toLocalDateStr, addDays } from '@/lib/utils'
+import { exportExcelFile, formatDate, formatCurrency, daysRemaining, safeNum, toLocalDateStr, addDays } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
@@ -56,7 +55,7 @@ export default function ExpiryAlerts() {
     setContractAlerts(filtered)
   }
 
-  function exportGovExcel() {
+  async function exportGovExcel() {
     const rows = govAlerts.map(s => ({
       'كود اللوحة': s.code,
       'العنوان': s.address,
@@ -64,15 +63,15 @@ export default function ExpiryAlerts() {
       'تاريخ الانتهاء': formatDate(s.gov_rental_end),
       'الأيام المتبقية': daysRemaining(s.gov_rental_end) ?? '—',
     }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'تنبيهات الترخيص')
-    XLSX.writeFile(wb, 'تنبيهات_الترخيص_الحكومي.xlsx')
+    await exportExcelFile('تنبيهات_الترخيص_الحكومي.xlsx', [
+      { name: 'تنبيهات الترخيص', rows },
+    ])
   }
 
-  function exportContractExcel() {
+  async function exportContractExcel() {
     const rows = contractAlerts.map(c => {
       const paid = (c.payments || []).reduce((a, p) => a + safeNum(p.amount), 0)
+      const balance = paid - safeNum(c.total_value)
       return {
         'كود اللوحة': c.stands?.code,
         'العنوان': c.stands?.address,
@@ -83,10 +82,9 @@ export default function ExpiryAlerts() {
         'المبلغ': balance >= 0 ? `له: ${formatCurrency(balance)}` : `عليه: ${formatCurrency(Math.abs(balance))}`,
       }
     })
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'عقود تنتهي قريباً')
-    XLSX.writeFile(wb, 'تنبيهات_انتهاء_العقود.xlsx')
+    await exportExcelFile('تنبيهات_انتهاء_العقود.xlsx', [
+      { name: 'عقود تنتهي قريباً', rows },
+    ])
   }
 
   function urgencyBadge(days) {

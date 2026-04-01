@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, BarChart3, FileText, Wrench, TrendingUp } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, getLast6MonthsLabels, statusLabels, toLocalDateStr, computeContractStatus } from '@/lib/utils'
+import { exportExcelFile, formatDate, formatCurrency, safeNum, getLast6MonthsLabels, statusLabels, toLocalDateStr, computeContractStatus } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
@@ -150,16 +149,16 @@ export default function Reports() {
     setMntData({ total, paid, unpaid: total - paid, byStand: Object.values(byStand), records: records || [] })
   }
 
-  function exportRevExcel() {
-    const wb = XLSX.utils.book_new()
+  async function exportRevExcel() {
     const summary = [['إجمالي الإيرادات', revData.total], ['الفترة من', revFrom], ['إلى', revTo]]
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'ملخص')
     const byStandRows = revData.byStand.map(s => ({ 'كود اللوحة': s.code, 'العنوان': s.address, 'الإجمالي (جنيه)': s.total }))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byStandRows), 'تفاصيل اللوحات')
-    XLSX.writeFile(wb, 'تقرير_الإيرادات.xlsx')
+    await exportExcelFile('تقرير_الإيرادات.xlsx', [
+      { name: 'ملخص', type: 'aoa', rows: summary },
+      { name: 'تفاصيل اللوحات', rows: byStandRows },
+    ])
   }
 
-  function exportCtExcel() {
+  async function exportCtExcel() {
     const rows = (ctData?.contracts || []).map(c => {
       const paid = (c.payments || []).reduce((a, p) => a + safeNum(p.amount), 0)
       let periodDue = 0
@@ -192,12 +191,12 @@ export default function Reports() {
         'الحالة': statusLabels[c.status] || c.status,
       }
     })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'العقود')
-    XLSX.writeFile(wb, 'تقرير_العقود.xlsx')
+    await exportExcelFile('تقرير_العقود.xlsx', [
+      { name: 'العقود', rows },
+    ])
   }
 
-  function exportMntExcel() {
+  async function exportMntExcel() {
     const rows = (mntData?.records || []).map(r => ({
       'كود اللوحة': r.stands?.code,
       'التاريخ': formatDate(r.date),
@@ -206,9 +205,9 @@ export default function Reports() {
       'التكلفة (جنيه)': safeNum(r.cost),
       'مدفوع': r.is_paid ? 'نعم' : 'لا',
     }))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'الصيانة')
-    XLSX.writeFile(wb, 'تقرير_الصيانة.xlsx')
+    await exportExcelFile('تقرير_الصيانة.xlsx', [
+      { name: 'الصيانة', rows },
+    ])
   }
 
   const CustomTooltip = ({ active, payload, label }) => {

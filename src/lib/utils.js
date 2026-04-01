@@ -1,5 +1,7 @@
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
 import { format, differenceInDays, isAfter, isBefore, parseISO } from 'date-fns'
 import { arEG } from 'date-fns/locale'
 
@@ -192,4 +194,48 @@ export function todayStr() {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+function setWorksheetColumns(worksheet, rows) {
+  const headers = Object.keys(rows[0] || {})
+  worksheet.columns = headers.map(header => ({
+    header,
+    key: header,
+    width: Math.max(String(header).length + 4, 16),
+  }))
+}
+
+function autosizeWorksheet(worksheet) {
+  worksheet.columns?.forEach(column => {
+    let maxLength = 12
+    column.eachCell({ includeEmpty: true }, cell => {
+      const value = cell.value == null ? '' : String(cell.value)
+      maxLength = Math.max(maxLength, value.length + 2)
+    })
+    column.width = Math.min(maxLength, 40)
+  })
+}
+
+export async function exportExcelFile(fileName, sheets) {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'view-billboard-app'
+  workbook.created = new Date()
+
+  sheets.forEach(sheet => {
+    const worksheet = workbook.addWorksheet(sheet.name)
+
+    if (sheet.type === 'aoa') {
+      worksheet.addRows(sheet.rows)
+      autosizeWorksheet(worksheet)
+      return
+    }
+
+    const rows = sheet.rows || []
+    setWorksheetColumns(worksheet, rows)
+    rows.forEach(row => worksheet.addRow(row))
+    autosizeWorksheet(worksheet)
+  })
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName)
 }
