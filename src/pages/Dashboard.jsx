@@ -248,7 +248,7 @@ export default function Dashboard() {
           {govAlerts.length > 0 && (
             <Card className="border-warning/40 bg-warning/5">
               <CardHeader className="pb-3">
-                <CardTitle className="text-warning flex flex-row-reverse items-center gap-2 text-base">
+                <CardTitle className="text-warning flex flex-reverse items-center gap-2 text-base">
                   <Bell className="w-5 h-5" />
                   تراخيص حكومية تنتهي قريباً ({govAlerts.length})
                 </CardTitle>
@@ -280,7 +280,7 @@ export default function Dashboard() {
           {contractAlerts.length > 0 && (
             <Card className="border-destructive/40 bg-destructive/5">
               <CardHeader className="pb-3">
-                <CardTitle className="text-destructive flex flex-row-reverse items-center gap-2 text-base">
+                <CardTitle className="text-destructive flex flex-reverse items-center gap-2 text-base">
                   <AlertCircle className="w-5 h-5" />
                   عقود تنتهي قريباً ({contractAlerts.length})
                 </CardTitle>
@@ -316,7 +316,7 @@ export default function Dashboard() {
         {/* Revenue bar chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex flex-row-reverse items-center gap-2 text-base">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
               <TrendingUp className="w-5 h-5 text-primary" />
               الإيرادات — آخر 6 أشهر
             </CardTitle>
@@ -341,7 +341,7 @@ export default function Dashboard() {
         {/* Stand status pie */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex flex-row-reverse items-center gap-2 text-base">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
               <PieChartIcon className="w-5 h-5 text-primary" />
               حالة اللوحات
             </CardTitle>
@@ -382,7 +382,7 @@ export default function Dashboard() {
         {/* Contract status pie */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex flex-row-reverse items-center gap-2 text-base">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
               <FileText className="w-5 h-5 text-primary" />
               حالة العقود
             </CardTitle>
@@ -420,7 +420,7 @@ export default function Dashboard() {
         {/* Recent payments */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex flex-row-reverse items-center gap-2 text-base">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
               <CreditCard className="w-5 h-5 text-primary" />
               آخر المدفوعات
             </CardTitle>

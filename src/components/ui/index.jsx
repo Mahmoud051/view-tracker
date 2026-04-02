@@ -6,6 +6,9 @@ import { cn } from '@/lib/utils'
 
 // ---- DateInput ----
 export { DateInput } from './date-input'
+export { Calendar } from './calendar'
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from './popover'
+export { Sheet, SheetTrigger, SheetClose, SheetPortal, SheetOverlay, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './sheet'
 
 // ---- Textarea ----
 export const Textarea = forwardRef(({ className, ...props }, ref) => (

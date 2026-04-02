@@ -2,6 +2,7 @@ import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog'
 import { cn, statusLabels } from '@/lib/utils'
 import { Button } from './button'
 import { Badge } from './badge'
+import { Card, CardContent } from './card'
 
 // ---- ConfirmDialog ----
 export function ConfirmDialog({ open, onOpenChange, title, description, confirmText = 'تأكيد', cancelText = 'إلغاء', onConfirm, variant = 'destructive' }) {
@@ -120,35 +121,33 @@ export function LoadingScreen() {
 // ---- StatCard ----
 export function StatCard({ title, value, icon: Icon, description, variant = 'default', className }) {
   const variants = {
-    default: 'from-primary/10 to-primary/5 border-primary/20',
-    success: 'from-success/10 to-success/5 border-success/20',
-    warning: 'from-warning/10 to-warning/5 border-warning/20',
-    danger: 'from-destructive/10 to-destructive/5 border-destructive/20',
-    info: 'from-info/10 to-info/5 border-info/20',
+    default: 'border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card',
+    success: 'border-success/20 bg-gradient-to-br from-success/10 via-card to-card',
+    warning: 'border-warning/20 bg-gradient-to-br from-warning/10 via-card to-card',
+    danger: 'border-destructive/20 bg-gradient-to-br from-destructive/10 via-card to-card',
+    info: 'border-info/20 bg-gradient-to-br from-info/10 via-card to-card',
   }
   const iconVariants = {
-    default: 'bg-primary/20 text-primary',
-    success: 'bg-success/20 text-success',
-    warning: 'bg-warning/20 text-warning',
-    danger: 'bg-destructive/20 text-destructive',
-    info: 'bg-info/20 text-info',
+    default: 'bg-primary/15 text-primary ring-1 ring-primary/15',
+    success: 'bg-success/15 text-success ring-1 ring-success/20',
+    warning: 'bg-warning/15 text-warning ring-1 ring-warning/20',
+    danger: 'bg-destructive/15 text-destructive ring-1 ring-destructive/20',
+    info: 'bg-info/15 text-info ring-1 ring-info/20',
   }
   return (
-    <div className={cn(
-      'rounded-2xl border bg-gradient-to-br p-5 flex flex-row-reverse items-start gap-4 card-hover',
-      variants[variant] || variants.default,
-      className
-    )}>
-      {Icon && (
-        <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0', iconVariants[variant] || iconVariants.default)}>
-          <Icon className="w-6 h-6" />
+    <Card className={cn('overflow-hidden rounded-2xl shadow-sm card-hover', variants[variant] || variants.default, className)}>
+      <CardContent className="flex min-h-[128px] flex-row-reverse items-start gap-4 p-5 text-right">
+        {Icon && (
+          <div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl', iconVariants[variant] || iconVariants.default)}>
+            <Icon className="h-6 w-6" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="truncate text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="break-words text-2xl font-bold leading-tight text-foreground">{value}</p>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-      )}
-      <div className="flex-1 min-w-0 text-right">
-        <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
-        <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

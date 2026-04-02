@@ -453,7 +453,7 @@ export default function ContractDetail() {
       {/* Payments */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex flex-row-reverse items-center gap-2">
+          <CardTitle className="flex flex-reverse items-center gap-2">
             <CreditCard className="w-5 h-5 text-primary" />
             سجل المدفوعات
           </CardTitle>

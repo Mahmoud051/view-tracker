@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
+import { Sheet, SheetContent } from './ui/sheet'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'لوحة التحكم', exact: true },
@@ -17,7 +18,7 @@ const navItems = [
   { to: '/reports', icon: BarChart3, label: 'التقارير' },
 ]
 
-export function Sidebar({ open, onClose, className }) {
+function SidebarContent({ onClose, className }) {
   const { signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
@@ -28,17 +29,13 @@ export function Sidebar({ open, onClose, className }) {
   }
 
   return (
-    <aside
+    <div
       className={cn(
-        'flex flex-col bg-card border-e border-border shadow-2xl transition-transform duration-300 ease-in-out z-50',
-        'xl:relative xl:translate-x-0 xl:z-auto xl:shadow-none',
-        'fixed top-0 start-0 bottom-0 w-[var(--sidebar-width)]',
-        open ? 'translate-x-0' : 'translate-x-full',
+        'flex h-full flex-col bg-card text-card-foreground',
         className
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center justify-between px-6 h-16 border-b border-border flex-shrink-0">
+      <div className="flex h-16 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg">
             <Eye className="w-5 h-5 text-primary-foreground" />
@@ -47,13 +44,12 @@ export function Sidebar({ open, onClose, className }) {
         </div>
         <button
           onClick={onClose}
-          className="xl:hidden text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground transition-colors lg:hidden"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {navItems.map(({ to, icon: Icon, label, exact }) => (
           <NavLink
@@ -74,7 +70,6 @@ export function Sidebar({ open, onClose, className }) {
         ))}
       </nav>
 
-      {/* Bottom actions */}
       <div className="flex-shrink-0 px-3 py-4 border-t border-border space-y-2">
         <button
           onClick={toggleTheme}
@@ -91,20 +86,42 @@ export function Sidebar({ open, onClose, className }) {
           <span>تسجيل الخروج</span>
         </button>
       </div>
-    </aside>
+    </div>
   )
 }
 
-// Mobile Header
+export function Sidebar({ open, onClose, className }) {
+  return (
+    <>
+      <aside
+        className={cn(
+          'hidden lg:flex lg:h-screen lg:w-[var(--sidebar-width)] lg:flex-col lg:border-s lg:border-border lg:bg-card',
+          className
+        )}
+      >
+        <SidebarContent />
+      </aside>
+
+      <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <SheetContent side="right" className="w-[var(--sidebar-width)] border-s border-border p-0 sm:max-w-[var(--sidebar-width)]">
+          <SidebarContent onClose={onClose} />
+        </SheetContent>
+      </Sheet>
+    </>
+  )
+}
+
 export function MobileHeader({ onMenuOpen }) {
   return (
-    <header className="xl:hidden flex items-center justify-between px-4 h-14 bg-card border-b border-border sticky top-0 z-30 shadow-sm">
-      <button
+    <header className="lg:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 shadow-sm">
+      <Button
         onClick={onMenuOpen}
-        className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-secondary"
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground hover:text-foreground"
       >
         <Menu className="w-5 h-5" />
-      </button>
+      </Button>
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
           <Eye className="w-4 h-4 text-primary-foreground" />

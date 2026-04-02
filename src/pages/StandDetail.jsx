@@ -233,7 +233,7 @@ export default function StandDetail() {
   const isStandActive = stand.is_active !== false
 
   return (
-    <div className={cn('space-y-6 animate-fade-in', !isStandActive && 'opacity-75')}>
+    <div dir="rtl" className={cn('space-y-6 animate-fade-in', !isStandActive && 'opacity-75')}>
 
       {/* ── Hero Header ─────────────────────────────────────── */}
       <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm">
@@ -260,7 +260,7 @@ export default function StandDetail() {
               <StatusBadge status={isRented ? 'rented' : 'available'} />
               <StatusBadge status={govStatus} />
             </div>
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 text-right">
               <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
               <span className="truncate">{stand.address}</span>
             </p>
@@ -291,7 +291,7 @@ export default function StandDetail() {
             { label: 'الأوجه', value: stand.sides == 2 ? 'وجهين' : 'وجه واحد', icon: FileText, color: 'text-warning' },
             { label: 'مستحق الآن', value: formatCurrency(periodDue), icon: DollarSign, color: periodDue > 0 ? 'text-destructive' : 'text-success' },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60">
+            <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60 text-right">
               <Icon className={cn('w-5 h-5 flex-shrink-0', color)} />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground leading-tight">{label}</p>
@@ -330,7 +330,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-row-reverse items-center gap-2">
+              <div className="flex flex-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Building2 className="w-4 h-4 text-primary" />
                 </div>
@@ -405,7 +405,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-row-reverse items-center gap-2">
+              <div className="flex flex-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-warning" />
                 </div>
@@ -472,7 +472,7 @@ export default function StandDetail() {
               <Card className="overflow-hidden">
                 <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
                 <CardHeader className="pb-2">
-                  <div className="flex flex-row-reverse items-center gap-2">
+                  <div className="flex flex-reverse items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                       <FileText className="w-4 h-4 text-success" />
                     </div>
@@ -482,7 +482,7 @@ export default function StandDetail() {
                 </CardHeader>
                 <CardContent>
                   {/* Client banner */}
-                  <div className="bg-primary/5 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 border border-primary/15">
+                  <div className="bg-primary/5 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 border border-primary/15 text-right">
                     <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-black text-lg flex-shrink-0">
                       {activeContract.clients?.name?.charAt(0)}
                     </div>
@@ -490,7 +490,7 @@ export default function StandDetail() {
                       <p className="font-bold text-foreground">{activeContract.clients?.name}</p>
                       <p className="text-xs text-muted-foreground">{activeContract.clients?.phone}</p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/contracts/${activeContract.id}`)} className="gap-1 text-xs">
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/contracts/${activeContract.id}`)} className="gap-1 text-xs flex-row-reverse">
                       التفاصيل <ChevronRight className="w-3 h-3" />
                     </Button>
                   </div>
@@ -518,7 +518,7 @@ export default function StandDetail() {
             <Card className="overflow-hidden">
               <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
               <CardHeader className="pb-2">
-                <div className="flex flex-row-reverse items-center gap-2">
+                <div className="flex flex-reverse items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
                     <Clock className="w-4 h-4 text-info" />
                   </div>
@@ -535,11 +535,11 @@ export default function StandDetail() {
                   )
                   const prevActive = prevContract && prevContract.status === 'active'
                   return (
-                    <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors text-start border border-border/60 mb-2 last:mb-0 group">
+                    <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors text-right border border-border/60 mb-2 last:mb-0 group">
                       <div className="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center font-black flex-shrink-0">
                         {c.clients?.name?.charAt(0)}
                       </div>
-                      <button className="flex-1 text-start" onClick={() => navigate(`/contracts/${c.id}`)}>
+                      <button className="flex-1 text-right" onClick={() => navigate(`/contracts/${c.id}`)}>
                         <p className="font-bold text-sm text-foreground">{c.clients?.name}</p>
                         <p className="text-xs text-muted-foreground">{formatDate(c.start_date)} — {formatDate(c.end_date)}</p>
                       </button>
@@ -577,7 +577,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-muted-foreground/30 via-muted-foreground/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex flex-row-reverse items-center gap-2">
+              <div className="flex flex-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                   <History className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -626,7 +626,7 @@ export default function StandDetail() {
         <TabsContent value="maintenance" className="mt-6 space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="bg-warning/10 border border-warning/25 rounded-xl px-4 py-2.5 flex items-center gap-2">
+              <div className="bg-warning/10 border border-warning/25 rounded-xl px-4 py-2.5 flex items-center gap-2 text-right">
                 <Wrench className="w-4 h-4 text-warning" />
                 <span className="text-xs text-muted-foreground">تكلفة الصيانة (6 أشهر):</span>
                 <span className="font-black text-warning text-sm">{formatCurrency(recentMaintCost)}</span>
@@ -712,7 +712,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex flex-row-reverse items-center gap-2">
+              <div className="flex flex-reverse items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-success" />
                 </div>

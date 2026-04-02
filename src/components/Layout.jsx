@@ -31,19 +31,11 @@ function Layout() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar — always rendered, responsive */}
       <Sidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm xl:hidden pointer-events-auto"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <MobileHeader onMenuOpen={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">
