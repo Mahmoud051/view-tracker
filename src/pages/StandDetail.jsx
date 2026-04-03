@@ -21,6 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { subMonths } from 'date-fns'
 
+const MEASUREMENT_INPUT_PATTERN = /^\d*(\.\d?)?$/
+const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d)?$/
+
 export default function StandDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -72,22 +75,51 @@ export default function StandDetail() {
     return (c.payments || []).reduce((a, p) => a + safeNum(p.amount), 0)
   }
 
+  // Contract total value (handle open contracts)
+  function contractTotalValue(c) {
+    if (c.is_open) {
+      if (!c.start_date || !c.monthly_rate) return contractPaid(c)
+      const INTERVAL = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+      const start = new Date(c.start_date)
+      const now = new Date()
+      const end = c.end_date ? new Date(c.end_date) : null
+      const nowCapped = end && now > end ? end : now
+      const intervalMonths = INTERVAL[c.payment_frequency || 'monthly'] || 1
+      const periodRate = safeNum(c.monthly_rate) * intervalMonths
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      const periodsDue = Math.ceil(completeMonths / intervalMonths)
+      return periodsDue * periodRate
+    }
+    return safeNum(c.total_value)
+  }
+
   // periodDue for active contract
   const periodDue = (() => {
-    if (!activeContract || !activeContract.start_date || !activeContract.payment_frequency) return 0
+    if (!activeContract || !activeContract.start_date) return 0
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
     const start = new Date(activeContract.start_date)
+    // Default to monthly if payment_frequency is not set
+    const paymentFreq = activeContract.payment_frequency || 'monthly'
+    // Cap at end_date for terminated/expired contracts
     const end = activeContract.end_date ? new Date(activeContract.end_date) : null
     const nowCapped = end && now > end ? end : now
-    const monthlyRate = safeNum(activeContract.total_value) / (parseInt(activeContract.duration_months) || 1)
-    const intervalMonths = INTERVAL_MONTHS[activeContract.payment_frequency] || 1
+    // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+    const monthlyRate = (activeContract.is_open && activeContract.monthly_rate) ? safeNum(activeContract.monthly_rate) : (safeNum(activeContract.total_value) / (parseInt(activeContract.duration_months) || 1))
+    const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
     const periodRate = monthlyRate * intervalMonths
     const paid = contractPaid(activeContract)
     const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
     const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-    const totalPeriods = Math.ceil((parseInt(activeContract.duration_months) || 1) / intervalMonths)
-    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+    let periodsDue
+    if (activeContract.is_open) {
+      periodsDue = Math.ceil(completeMonths / intervalMonths)
+    } else {
+      const totalPeriods = Math.ceil((parseInt(activeContract.duration_months) || 1) / intervalMonths)
+      periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    }
     return Math.max(0, periodsDue * periodRate - paid)
   })()
 
@@ -103,7 +135,16 @@ export default function StandDetail() {
     .filter(p => p.payment_date && new Date(p.payment_date) >= sixMonthsAgo)
     .reduce((a, p) => a + safeNum(p.amount), 0)
 
+  function updateInfoMeasurement(field, value) {
+    if (!MEASUREMENT_INPUT_PATTERN.test(value)) return
+    setInfoForm(prev => ({ ...prev, [field]: value }))
+  }
+
   async function saveInfo() {
+    if (!MEASUREMENT_VALUE_PATTERN.test(String(infoForm.width).trim()) || !MEASUREMENT_VALUE_PATTERN.test(String(infoForm.height).trim())) {
+      toast({ title: 'خطأ', description: 'الطول والعرض يجب أن يكونا أرقامًا صحيحة أو بمنزلة عشرية واحدة فقط مثل 1 أو 1.1', variant: 'error' })
+      return
+    }
     setSaving(true)
     try {
       let updates = {
@@ -361,8 +402,8 @@ export default function StandDetail() {
                   <FormField label="كود اللوحة"><Input value={infoForm.code} onChange={e => setInfoForm({...infoForm, code: e.target.value})} /></FormField>
                   <FormField label="العنوان" className="sm:col-span-2"><Input value={infoForm.address} onChange={e => setInfoForm({...infoForm, address: e.target.value})} /></FormField>
                   <FormField label="الوصف" className="sm:col-span-2"><Textarea value={infoForm.desc} onChange={e => setInfoForm({...infoForm, desc: e.target.value})} placeholder="وصف اللوحة والموقع..." /></FormField>
-                  <FormField label="الطول (م)"><Input type="number" value={infoForm.width} onChange={e => setInfoForm({...infoForm, width: e.target.value})} /></FormField>
-                  <FormField label="العرض (م)"><Input type="number" value={infoForm.height} onChange={e => setInfoForm({...infoForm, height: e.target.value})} /></FormField>
+                  <FormField label="الطول (م)"><Input type="text" inputMode="decimal" value={infoForm.width} onChange={e => updateInfoMeasurement('width', e.target.value)} /></FormField>
+                  <FormField label="العرض (م)"><Input type="text" inputMode="decimal" value={infoForm.height} onChange={e => updateInfoMeasurement('height', e.target.value)} /></FormField>
                   <FormField label="عدد الأوجه">
                     <Select value={String(infoForm.sides)} onValueChange={v => setInfoForm({...infoForm, sides: parseInt(v)})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -502,7 +543,7 @@ export default function StandDetail() {
                       ['قيمة العقد', formatCurrency(activeContract.total_value), 'text-primary font-black'],
                       ['المدفوع', formatCurrency(contractPaid(activeContract)), 'text-success font-bold'],
                       ['مستحق الآن', formatCurrency(periodDue), periodDue > 0 ? 'text-destructive font-black' : 'text-success font-bold'],
-                      ['مدة العقد', `${activeContract.duration_months || '—'} شهر`, 'text-foreground'],
+                      ['مدة العقد', `${activeContract.duration_months?activeContract.duration_months + "شهر" : 'غير محدد'}`, 'text-foreground'],
                     ].map(([k, v, cls]) => (
                       <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
                         <p className="text-xs text-muted-foreground mb-1">{k}</p>
@@ -707,7 +748,7 @@ export default function StandDetail() {
             <StatCard title="الإيرادات (6 أشهر)" value={formatCurrency(recentRevenue)} icon={BarChart3} variant="success" />
             <StatCard title="إجمالي العقود" value={contracts.length} icon={FileText} variant="info" />
             <StatCard title="إجمالي المدفوع" value={formatCurrency(contracts.reduce((a, c) => a + contractPaid(c), 0))} icon={DollarSign} variant="default" />
-            <StatCard title="إجمالي مستحق" value={formatCurrency(contracts.reduce((a, c) => a + Math.max(0, safeNum(c.total_value) - contractPaid(c)), 0))} icon={Clock} variant={recentRevenue > 0 ? 'danger' : 'warning'} />
+            <StatCard title="إجمالي مستحق" value={formatCurrency(contracts.reduce((a, c) => a + Math.max(0, contractTotalValue(c) - contractPaid(c)), 0))} icon={Clock} variant={recentRevenue > 0 ? 'danger' : 'warning'} />
           </div>
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
@@ -732,8 +773,9 @@ export default function StandDetail() {
                 <TableBody>
                   {contracts.map(c => {
                     const paid = contractPaid(c)
-                    const owed = Math.max(0, safeNum(c.total_value) - paid)
-                    const credit = Math.max(0, paid - safeNum(c.total_value))
+                    const totalVal = contractTotalValue(c)
+                    const owed = Math.max(0, totalVal - paid)
+                    const credit = Math.max(0, paid - totalVal)
                     const hasOwed = owed > 0
                     const hasCredit = credit > 0
                     return (
@@ -746,7 +788,7 @@ export default function StandDetail() {
                             <span className="font-medium">{c.clients?.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-bold text-sm">{formatCurrency(c.total_value)}</TableCell>
+                        <TableCell className="font-bold text-sm">{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>
                         <TableCell className={hasOwed ? 'text-destructive font-bold' : 'text-success font-bold text-sm'}>
                           {formatCurrency(paid)}
                         </TableCell>

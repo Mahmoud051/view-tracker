@@ -56,6 +56,11 @@ export function computeContractStatus(startDate, endDate, storedStatus) {
   today.setHours(0, 0, 0, 0)
   try {
     const start = typeof startDate === 'string' ? parseISO(startDate) : startDate
+    // Open contract: no end date
+    if (!endDate) {
+      if (start && isAfter(start, today)) return 'upcoming'
+      return 'active'
+    }
     const end = typeof endDate === 'string' ? parseISO(endDate) : endDate
     if (isAfter(start, today)) return 'upcoming'
     if (isBefore(end, today)) return 'expired'
@@ -75,6 +80,7 @@ export const statusLabels = {
   available: 'متاح',
   rented: 'مؤجر',
   inactive: 'متوقف',
+  open: 'مفتوح',
 }
 
 export const rentalTypeLabels = {

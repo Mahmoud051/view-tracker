@@ -136,16 +136,16 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
   }
   return (
     <Card className={cn('overflow-hidden rounded-2xl shadow-sm card-hover', variants[variant] || variants.default, className)}>
-      <CardContent className="flex min-h-[128px] flex-row-reverse items-start gap-4 p-5 text-right">
+      <CardContent className="flex min-h-[110px] flex-row-reverse items-start gap-3 p-4 text-right">
         {Icon && (
-          <div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl', iconVariants[variant] || iconVariants.default)}>
-            <Icon className="h-6 w-6" />
+          <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', iconVariants[variant] || iconVariants.default)}>
+            <Icon className="h-5 w-5" />
           </div>
         )}
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="truncate text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="break-words text-2xl font-bold leading-tight text-foreground">{value}</p>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="truncate text-xs font-medium text-muted-foreground">{title}</p>
+          <p className="break-words text-xl font-bold leading-tight text-foreground">{value}</p>
+          {description && <p className="text-[10px] text-muted-foreground">{description}</p>}
         </div>
       </CardContent>
     </Card>

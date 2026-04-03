@@ -31,6 +31,7 @@ const EMPTY_FORM = {
   payment_interval: 'monthly',
   total_value: '', price_per_period: '',
   notes: '', status: 'active', previous_end_date: null,
+  is_open: false,
 }
 const EMPTY_CLIENT = { name: '', phone: '' }
 
@@ -247,7 +248,11 @@ export default function Contracts() {
     return matchStatus && matchSearch
   })
 
-  function computeValues(startDate, durationMonths, monthlyRate, interval) {
+  function computeValues(startDate, durationMonths, monthlyRate, interval, isOpen) {
+    if (isOpen) {
+      // Open contract: no end date, no total value calculation
+      return { end_date: '', total_value: '', price_per_period: '' }
+    }
     if (!startDate || !durationMonths) {
       return { end_date: '', total_value: '', price_per_period: '' }
     }
@@ -273,12 +278,13 @@ export default function Contracts() {
 
   function onFormChange(field, value) {
     const updated = { ...form, [field]: value }
-    if (field === 'start_date' || field === 'duration_months' || field === 'monthly_rate' || field === 'payment_interval') {
+    if (field === 'start_date' || field === 'duration_months' || field === 'monthly_rate' || field === 'payment_interval' || field === 'is_open') {
       const computed = computeValues(
         field === 'start_date' ? value : updated.start_date,
         field === 'duration_months' ? value : updated.duration_months,
         field === 'monthly_rate' ? value : updated.monthly_rate,
         field === 'payment_interval' ? value : updated.payment_interval,
+        field === 'is_open' ? value : updated.is_open,
       )
       updated.end_date = computed.end_date
       updated.total_value = computed.total_value
@@ -295,8 +301,11 @@ export default function Contracts() {
     if (form.previous_end_date && form.start_date < form.previous_end_date) {
       errs.start_date = `يجب أن يكون بعد أو مساوياً لتاريخ انتهاء العقد السابق (${formatDate(form.previous_end_date)})`
     }
-    const durationError = getDurationCompatibilityError(form.duration_months, form.payment_interval)
-    if (durationError) errs.duration_months = durationError
+    // Only validate duration if not open contract
+    if (!form.is_open) {
+      const durationError = getDurationCompatibilityError(form.duration_months, form.payment_interval)
+      if (durationError) errs.duration_months = durationError
+    }
     if (!form.monthly_rate || isNaN(form.monthly_rate) || parseFloat(form.monthly_rate) <= 0) errs.monthly_rate = 'السعر الشهري مطلوب'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
@@ -306,35 +315,49 @@ export default function Contracts() {
     if (!validateForm()) return
     setSaving(true)
     try {
+      // Check if stand already has an active or open contract (not terminated)
       const { data: existing } = await supabase
         .from('contracts')
-        .select('id')
+        .select('id, status')
         .eq('stand_id', form.stand_id)
-        .eq('status', 'active')
+        .neq('status', 'terminated')
+        .neq('status', 'expired')
         .limit(1)
 
-      let status = form.status
-      if (existing && existing.length > 0) status = 'upcoming'
-      else {
-        const today = toLocalDateStr(new Date())
-        if (form.start_date > today) status = 'upcoming'
+      if (existing && existing.length > 0) {
+        const existingContract = existing[0]
+        // Block if stand has active or upcoming contract
+        if (existingContract.status === 'active' || existingContract.status === 'upcoming') {
+          toast({ 
+            title: 'خطأ', 
+            description: 'هذه اللوحة لديها عقد نشط أو قادم بالفعل. لا يمكن إنشاء عقد جديد حتى ينتهي العقد السابق.', 
+            variant: 'error' 
+          })
+          setSaving(false)
+          return
+        }
       }
+
+      let status = form.status
+      const today = toLocalDateStr(new Date())
+      if (form.start_date > today) status = 'upcoming'
 
       const { error } = await supabase.from('contracts').insert([{
         stand_id: form.stand_id,
         client_id: form.client_id,
         start_date: form.start_date,
-        end_date: form.end_date,
-        duration_months: parseInt(form.duration_months) || null,
+        end_date: form.is_open ? null : form.end_date,
+        duration_months: form.is_open ? null : (parseInt(form.duration_months) || null),
         payment_frequency: form.payment_interval,
         monthly_rate: parseFloat(form.monthly_rate),
-        price_per_period: parseFloat(form.price_per_period),
-        total_value: parseFloat(form.total_value),
+        price_per_period: form.is_open ? null : (parseFloat(form.price_per_period) || null),
+        total_value: form.is_open ? null : (parseFloat(form.total_value) || null),
         status,
         notes: form.notes || null,
+        is_open: form.is_open,
       }])
       if (error) throw error
-      toast({ title: 'تم الحفظ', description: `تم إنشاء العقد بحالة: ${status === 'upcoming' ? 'قادم' : 'نشط'}`, variant: 'success' })
+      toast({ title: 'تم الحفظ', description: `تم إنشاء العقد بحالة: ${status === 'upcoming' ? 'قادم' : 'نشط'}${form.is_open ? ' (عقد مفتوح)' : ''}`, variant: 'success' })
       setDialogOpen(false)
       setForm({ ...EMPTY_FORM, start_date: todayStr() })
       fetchData()
@@ -404,30 +427,63 @@ export default function Contracts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>اللوحة</TableHead><TableHead>العميل</TableHead><TableHead>المدة</TableHead>
-                  <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة</TableHead>
+                  <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة الإجمالية</TableHead>
                   <TableHead>المدفوع</TableHead><TableHead>مستحق الآن</TableHead><TableHead>الحالة</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(c => {
                   const paid = paymentsMap[c.id] || 0
-                  const owed = Math.max(0, safeNum(c.total_value) - paid)
                   const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
-                  // Period-based amount due
+
+                  // Calculate totalValue for open contracts using elapsed periods
+                  let contractTotalValue
+                  if (c.is_open) {
+                    if (!c.start_date || !c.monthly_rate) {
+                      contractTotalValue = paid
+                    } else {
+                      const start = new Date(c.start_date)
+                      const end = c.end_date ? new Date(c.end_date) : null
+                      const nowCapped = end && new Date() > end ? end : new Date()
+                      const intervalMonths = INTERVAL_MONTHS[c.payment_frequency || 'monthly'] || 1
+                      const periodRate = safeNum(c.monthly_rate) * intervalMonths
+                      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+                      const periodsDue = Math.ceil(completeMonths / intervalMonths)
+                      contractTotalValue = periodsDue * periodRate
+                    }
+                  } else {
+                    contractTotalValue = safeNum(c.total_value)
+                  }
+                  const owed = Math.max(0, contractTotalValue - paid)
+
+                  // Period-based amount due (for all non-upcoming contracts)
                   let periodDue = 0
-                  if (realStatus === 'active' && c.start_date && c.payment_frequency) {
+                  if (c.start_date && realStatus !== 'upcoming') {
                     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
                     const now = new Date()
                     const start = new Date(c.start_date)
+                    // Default to monthly if payment_frequency is not set
+                    const paymentFreq = c.payment_frequency || 'monthly'
+                    // Cap at end_date for terminated/expired/open contracts
                     const end = c.end_date ? new Date(c.end_date) : null
                     const nowCapped = end && now > end ? end : now
-                    const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-                    const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+                    // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+                    const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+                    const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
                     const periodRate = monthlyRate * intervalMonths
-                    const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
-                    const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-                    const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-                    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+                    let periodsDue
+                    if (c.is_open) {
+                      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+                      periodsDue = Math.ceil(completeMonths / intervalMonths)
+                    } else {
+                      const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+                      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+                      periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+                    }
                     periodDue = Math.max(0, periodsDue * periodRate - paid)
                   }
                   return (
@@ -440,11 +496,15 @@ export default function Contracts() {
                         <p className="font-medium text-sm">{c.clients?.name}</p>
                         <p className="text-xs text-muted-foreground">{c.clients?.phone}</p>
                       </TableCell>
-                      <TableCell className="text-sm">{c.duration_months} شهر</TableCell>
+                      <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${c.duration_months} شهر`}</TableCell>
                       <TableCell className="text-sm">{formatDate(c.start_date)}</TableCell>
                       <TableCell className="text-sm">
-                        <p>{formatDate(c.end_date)}</p>
-                        {realStatus !== 'expired' && realStatus !== 'terminated' && c.end_date && (() => {
+                        {c.is_open ? (
+                          <span className="text-xs font-medium text-info">بدون نهاية</span>
+                        ) : (
+                          <p>{formatDate(c.end_date)}</p>
+                        )}
+                        {!c.is_open && realStatus !== 'expired' && realStatus !== 'terminated' && c.end_date && (() => {
                           const daysLeft = Math.ceil((new Date(c.end_date) - new Date()) / 86400000)
                           if (daysLeft <= 0) return null
                           return (
@@ -454,8 +514,8 @@ export default function Contracts() {
                           )
                         })()}
                       </TableCell>
-                      <TableCell className="text-sm font-medium">{formatCurrency(c.total_value)}</TableCell>
-                      <TableCell className={`text-sm font-medium ${paid >= safeNum(c.total_value) ? 'text-success' : 'text-muted-foreground'}`}>
+                      <TableCell className="text-sm font-medium">{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>
+                      <TableCell className={`text-sm font-medium ${paid >= contractTotalValue ? 'text-success' : 'text-muted-foreground'}`}>
                         {formatCurrency(paid)}
                       </TableCell>
                       <TableCell className={`text-sm font-medium ${periodDue > 0 ? 'text-destructive' : 'text-success'}`}>
@@ -492,6 +552,21 @@ export default function Contracts() {
                 onAddNew={() => setClientDialogOpen(true)}
               />
             </FormField>
+
+            {/* Open Contract Toggle */}
+            <div className="sm:col-span-2 flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+              <input
+                type="checkbox"
+                id="is_open"
+                checked={form.is_open}
+                onChange={e => onFormChange('is_open', e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <label htmlFor="is_open" className="text-sm font-medium text-foreground cursor-pointer">
+                عقد مفتوح (بدون تاريخ نهاية)
+              </label>
+            </div>
+
             <FormField label="تاريخ البداية" required error={formErrors.start_date}>
               <DateInput
                 value={form.start_date}
@@ -501,23 +576,33 @@ export default function Contracts() {
                 <p className="text-xs text-muted-foreground mt-1">العقد السابق ينتهي: <span className="font-medium">{formatDate(form.previous_end_date)}</span> — يجب أن يكون البداية ≥ نهاية السابق</p>
               )}
             </FormField>
-            <FormField label="مدة العقد (أشهر)" required error={formErrors.duration_months}>
-              <Input
-                type="number"
-                value={form.duration_months}
-                min="1"
-                onChange={e => onFormChange('duration_months', e.target.value)}
-                placeholder="مثال: 12"
-              />
-              {form.duration_months > 0 && durationErrorPreview && (
-                <p className="text-xs text-warning mt-1">
-                  ⚠ {durationErrorPreview}
-                </p>
-              )}
-            </FormField>
-            <FormField label="تاريخ النهاية">
-              <DateInput value={form.end_date} readOnly className="bg-muted cursor-not-allowed" />
-            </FormField>
+            {!form.is_open && (
+              <FormField label="مدة العقد (أشهر)" required error={formErrors.duration_months}>
+                <Input
+                  type="number"
+                  value={form.duration_months}
+                  min="1"
+                  onChange={e => onFormChange('duration_months', e.target.value)}
+                  placeholder="مثال: 12"
+                />
+                {form.duration_months > 0 && durationErrorPreview && (
+                  <p className="text-xs text-warning mt-1">
+                    ⚠ {durationErrorPreview}
+                  </p>
+                )}
+              </FormField>
+            )}
+            {!form.is_open && (
+              <FormField label="تاريخ النهاية">
+                <DateInput value={form.end_date} readOnly className="bg-muted cursor-not-allowed" />
+              </FormField>
+            )}
+            {form.is_open && (
+              <div className="sm:col-span-2 p-3 rounded-xl border border-info/30 bg-info/5">
+                <p className="text-sm text-info font-medium">✓ عقد مفتوح - لا يوجد تاريخ انتهاء</p>
+                <p className="text-xs text-muted-foreground mt-1">سينتهي العقد فقط عند تغيير نوعه أو إنهائه يدوياً</p>
+              </div>
+            )}
             <FormField label="فترة الدفع" required>
               <Select value={form.payment_interval} onValueChange={v => onFormChange('payment_interval', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -539,7 +624,7 @@ export default function Contracts() {
                 مثال: 100 جنيه في الشهر × {form.duration_months || '?'} شهر = {form.total_value ? formatCurrency(parseFloat(form.total_value)).replace('جنيه', '').trim() + ' جنيه' : '?'}
               </p>
             </FormField>
-            {monthlyRate > 0 && form.duration_months > 0 && (
+            {monthlyRate > 0 && form.duration_months > 0 && !form.is_open && (
               <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[form.payment_interval].split('(')[0].trim()})`}>
                 <div className="h-10 px-3 flex items-center bg-muted/50 rounded-lg border border-border text-sm">
                   <span className="font-bold text-success">
@@ -554,9 +639,23 @@ export default function Contracts() {
                 </p>
               </FormField>
             )}
-            <FormField label="القيمة الإجمالية">
-              <Input type="number" value={form.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
-            </FormField>
+            {!form.is_open && (
+              <FormField label="القيمة الإجمالية">
+                <Input type="number" value={form.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
+              </FormField>
+            )}
+            {form.is_open && (
+              <FormField label="السعر للدفعة الواحدة">
+                <div className="h-10 px-3 flex items-center bg-muted/50 rounded-lg border border-border text-sm">
+                  <span className="font-bold text-success">
+                    {formatCurrency(perPeriodAmount)}
+                  </span>
+                  <span className="text-muted-foreground ms-2 text-xs">
+                    كل {intervalMonths} {intervalMonths === 1 ? 'شهر' : intervalMonths === 3 ? 'أشهر' : intervalMonths === 6 ? 'أشهر' : 'شهر'}
+                  </span>
+                </div>
+              </FormField>
+            )}
             <FormField label="ملاحظات" className="sm:col-span-2">
               <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="ملاحظات اختيارية..." rows={3} />
             </FormField>

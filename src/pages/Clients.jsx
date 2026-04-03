@@ -29,7 +29,7 @@ export default function Clients() {
     setLoading(true)
     const [{ data: c }, { data: contracts }, { data: payments }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
-      supabase.from('contracts').select('id, client_id, status, total_value, start_date, end_date, duration_months, payment_frequency, stands(code, address)'),
+      supabase.from('contracts').select('id, client_id, status, total_value, start_date, end_date, duration_months, payment_frequency, monthly_rate, is_open, stands(code, address)'),
       supabase.from('payments').select('id, contract_id, amount'),
     ])
     setClients(c || [])
@@ -60,27 +60,60 @@ export default function Clients() {
   function clientStats(clientId) {
     const cts = contractsMap[clientId] || []
     const active = cts.filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
-    const totalValue = cts.reduce((a, c) => a + safeNum(c.total_value), 0)
+
+    // totalValue: handle open contracts by calculating elapsed period value
+    const INTERVAL_FOR_TOTAL = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+    const nowForTotal = new Date()
+    const totalValue = cts.reduce((a, c) => {
+      if (c.is_open) {
+        if (!c.start_date || !c.monthly_rate) return a + (paymentsMap[c.id] || 0)
+        const start = new Date(c.start_date)
+        const end = c.end_date ? new Date(c.end_date) : null
+        const nowCapped = end && nowForTotal > end ? end : nowForTotal
+        const intervalMonths = INTERVAL_FOR_TOTAL[c.payment_frequency || 'monthly'] || 1
+        const periodRate = safeNum(c.monthly_rate) * intervalMonths
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+        const periodsDue = Math.ceil(completeMonths / intervalMonths)
+        return a + (periodsDue * periodRate)
+      }
+      return a + safeNum(c.total_value)
+    }, 0)
     const totalPaid = cts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
     const owed = Math.max(0, totalValue - totalPaid)
 
-    // periodDue: sum of period-based amounts due across all active contracts
+    // periodDue: sum across ALL contracts (not just active)
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
     let periodDue = 0
-    active.forEach(c => {
-      if (!c.start_date || !c.payment_frequency) return
+    cts.forEach(c => {
+      if (!c.start_date) return
+      const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+      if (realStatus === 'upcoming') return
+      // Detect open contracts: either is_open flag is true, OR end_date/duration_months is null
+      const isOpen = c.is_open || !c.end_date || !c.duration_months
+      // Default to monthly if payment_frequency is not set
+      const paymentFreq = c.payment_frequency || 'monthly'
       const start = new Date(c.start_date)
+      // Cap at end_date for terminated/expired contracts
       const end = c.end_date ? new Date(c.end_date) : null
       const nowCapped = end && now > end ? end : now
-      const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-      const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+      // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+      const monthlyRate = isOpen && c.monthly_rate ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+      const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
       const periodRate = monthlyRate * intervalMonths
       const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
       const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-      const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-      const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
-      periodDue += Math.max(0, periodsDue * periodRate - (paymentsMap[c.id] || 0))
+
+      let periodsDue
+      if (isOpen) {
+        periodsDue = Math.ceil(completeMonths / intervalMonths)
+      } else {
+        const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+        periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+      }
+      const due = periodsDue * periodRate - (paymentsMap[c.id] || 0)
+      periodDue += Math.max(0, due)
     })
 
     // Nearest contract expiry among active contracts
@@ -160,38 +193,26 @@ export default function Clients() {
                   </div>
                 </div>
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 py-3 border-t border-border">
+                <div className="grid grid-cols-2 gap-2 py-3 border-t border-border">
                   <div className="text-center">
                     <p className="text-lg font-bold text-foreground">{stats.active}</p>
                     <p className="text-xs text-muted-foreground">نشط</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-bold text-foreground truncate">{formatCurrency(stats.totalValue).replace(' جنيه', '')}</p>
-                    <p className="text-xs text-muted-foreground">إجمالي</p>
+                    <p className="text-xs text-muted-foreground">إجمالي حالي</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-bold text-success truncate">{formatCurrency(stats.totalPaid).replace(' جنيه', '')}</p>
                     <p className="text-xs text-muted-foreground">المدفوع</p>
                   </div>
-                </div>
-
-                {/* periodDue / owed row */}
-                {(stats.periodDue > 0 || stats.owed > 0) && (
-                  <div className="flex items-center gap-2 py-2 border-t border-border ">
-                    {stats.periodDue > 0 && (
-                      <div className="flex items-center gap-1 text-destructive pe-1">
-                        <Calendar className="w-3 h-3" />
-                        <span className="text-xs font-medium">مستحق: {formatCurrency(stats.periodDue).replace(' جنيه', '')}</span>
-                      </div>
-                    )}
-                    {stats.owed > 0 && stats.periodDue === 0 && (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        <span className="text-xs">الباقي: {formatCurrency(stats.owed).replace(' جنيه', '')}</span>
-                      </div>
-                    )}
+                  <div className="text-center">
+                    <p className={`text-sm font-bold truncate ${(stats.periodDue > 0 || stats.owed > 0) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {formatCurrency(stats.periodDue > 0 ? stats.periodDue : stats.owed).replace(' جنيه', '')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">المتبقي</p>
                   </div>
-                )}
+                </div>
 
                 {/* Nearest contract */}
                 {stats.nearestContract && (

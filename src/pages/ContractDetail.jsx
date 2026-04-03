@@ -74,6 +74,7 @@ export default function ContractDetail() {
         total_value: c.total_value,
         price_per_period: c.price_per_period || '',
         notes: c.notes || '',
+        is_open: c.is_open || false,
       })
     }
     setLoading(false)
@@ -85,19 +86,31 @@ export default function ContractDetail() {
 
   // Period-based amount due (how much should be paid by now based on payment cycle)
   let periodDue = 0
-  if (contract && displayStatus === 'active' && contract.start_date && contract.payment_frequency) {
+  if (contract && displayStatus !== 'upcoming' && contract.start_date) {
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
     const start = new Date(contract.start_date)
+    // Default to monthly if payment_frequency is not set
+    const paymentFreq = contract.payment_frequency || 'monthly'
+    // Cap at end_date for terminated/expired contracts
     const end = contract.end_date ? new Date(contract.end_date) : null
     const nowCapped = end && now > end ? end : now
-    const monthlyRate = safeNum(contract.total_value) / (parseInt(contract.duration_months) || 1)
-    const intervalMonths = INTERVAL_MONTHS[contract.payment_frequency] || 1
+    // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+    const monthlyRate = (contract.is_open && contract.monthly_rate) ? safeNum(contract.monthly_rate) : (safeNum(contract.total_value) / (parseInt(contract.duration_months) || 1))
+    const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
     const periodRate = monthlyRate * intervalMonths
-    const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
-    const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-    const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
-    const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+    let periodsDue
+    if (contract.is_open) {
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.ceil(completeMonths / intervalMonths)
+    } else {
+      const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    }
     periodDue = Math.max(0, periodsDue * periodRate - totalPaid)
   }
 
@@ -125,15 +138,25 @@ export default function ContractDetail() {
   }
 
   async function terminateContract() {
-    const { error } = await supabase.from('contracts').update({ status: 'terminated' }).eq('id', id)
+    const today = toLocalDateStr(new Date())
+    const { error } = await supabase.from('contracts').update({ 
+      status: 'terminated',
+      end_date: today  // Set end date to termination date for open contracts
+    }).eq('id', id)
     if (!error) {
       toast({ title: 'تم إنهاء العقد', variant: 'success' })
       setTerminateConfirm(false)
       fetchAll()
+    } else {
+      toast({ title: 'خطأ', description: error.message, variant: 'error' })
     }
   }
 
-  function updateEndDate(startDate, durationMonths, monthlyRate, interval) {
+  function updateEndDate(startDate, durationMonths, monthlyRate, interval, isOpen) {
+    if (isOpen) {
+      setEditContractForm(f => ({ ...f, end_date: '', total_value: '', price_per_period: '' }))
+      return
+    }
     if (!startDate || !durationMonths) { setEditContractForm(f => ({ ...f, end_date: '', total_value: '', price_per_period: '' })); return }
     try {
       const start = new Date(startDate)
@@ -154,8 +177,11 @@ export default function ContractDetail() {
     if (!editContractForm.stand_id) errs.stand_id = 'اختر اللوحة'
     if (!editContractForm.client_id) errs.client_id = 'اختر العميل'
     if (!editContractForm.start_date) errs.start_date = 'تاريخ البداية مطلوب'
-    const durationError = getDurationCompatibilityError(editContractForm.duration_months, editContractForm.payment_frequency)
-    if (durationError) errs.duration_months = durationError
+    // Only validate duration if not open contract
+    if (!editContractForm.is_open) {
+      const durationError = getDurationCompatibilityError(editContractForm.duration_months, editContractForm.payment_frequency)
+      if (durationError) errs.duration_months = durationError
+    }
     if (!editContractForm.monthly_rate || isNaN(editContractForm.monthly_rate) || parseFloat(editContractForm.monthly_rate) <= 0) {
       errs.monthly_rate = 'السعر الشهري مطلوب'
     }
@@ -231,13 +257,14 @@ export default function ContractDetail() {
         stand_id: editContractForm.stand_id,
         client_id: editContractForm.client_id,
         start_date: editContractForm.start_date,
-        end_date: editContractForm.end_date,
-        duration_months: parseInt(editContractForm.duration_months) || null,
+        end_date: editContractForm.is_open ? null : editContractForm.end_date,
+        duration_months: editContractForm.is_open ? null : (parseInt(editContractForm.duration_months) || null),
         payment_frequency: editContractForm.payment_frequency,
         monthly_rate: parseFloat(editContractForm.monthly_rate) || 0,
-        price_per_period: parseFloat(editContractForm.price_per_period) || 0,
-        total_value: parseFloat(editContractForm.total_value) || 0,
+        price_per_period: editContractForm.is_open ? null : (parseFloat(editContractForm.price_per_period) || 0),
+        total_value: editContractForm.is_open ? null : (parseFloat(editContractForm.total_value) || 0),
         notes: editContractForm.notes || null,
+        is_open: editContractForm.is_open,
       }).eq('id', id)
       if (error) throw error
       toast({ title: 'تم تحديث العقد', variant: 'success' })
@@ -322,11 +349,11 @@ export default function ContractDetail() {
 
   <h2>تفاصيل العقد</h2>
   <div class="grid">
-    <div class="field"><div class="label">مدة العقد</div><div class="value">${contract.duration_months || '—'} شهر</div></div>
+    <div class="field"><div class="label">نوع العقد</div><div class="value">${contract.is_open ? 'عقد مفتوح' : (contract.duration_months || '—') + ' شهر'}</div></div>
     <div class="field"><div class="label">نظام الدفع</div><div class="value">${paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency}</div></div>
     <div class="field"><div class="label">تاريخ البداية</div><div class="value">${formatDate(contract.start_date)}</div></div>
-    <div class="field"><div class="label">قيمة العقد الإجمالية</div><div class="value">${formatCurrency(contract.total_value)}</div></div>
-    <div class="field"><div class="label">تاريخ النهاية</div><div class="value">${formatDate(contract.end_date)}</div></div>
+    <div class="field"><div class="label">قيمة العقد الإجمالية</div><div class="value">${contract.is_open ? '— (عقد مفتوح)' : formatCurrency(contract.total_value)}</div></div>
+    <div class="field"><div class="label">تاريخ النهاية</div><div class="value">${contract.is_open ? 'بدون نهاية' : formatDate(contract.end_date)}</div></div>
     <div class="field"><div class="label">المبلغ المدفوع</div><div class="value">${formatCurrency(totalPaid)}</div></div>
     <div class="field"><div class="label">${balance >= 0 ? 'له / رصيد مدفوع' : 'عليه / مستحق'}</div><div class="value" style="color:${balance >= 0 ? '#16a34a' : '#dc2626'}">${formatCurrency(Math.abs(balance))}</div></div>
   </div>
@@ -402,7 +429,7 @@ export default function ContractDetail() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="قيمة العقد" value={formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
+        <StatCard title="قيمة العقد" value={contract.is_open ? '—' : formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
         <StatCard title="المدفوع" value={formatCurrency(totalPaid)} icon={CheckCircle} variant="success" />
         <StatCard
           title="مستحق الآن"
@@ -411,8 +438,8 @@ export default function ContractDetail() {
           variant={periodDue > 0 ? 'danger' : 'success'}
         />
         <StatCard
-          title="مدة العقد"
-          value={`${contract.duration_months || '—'} شهر`}
+          title={contract.is_open ? "نوع العقد" : "مدة العقد"}
+          value={contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`}
           icon={CreditCard}
           variant="info"
         />
@@ -428,12 +455,12 @@ export default function ContractDetail() {
               ['العنوان', contract.stands?.address],
               ['العميل', contract.clients?.name],
               ['الهاتف', contract.clients?.phone],
-              ['مدة العقد', `${contract.duration_months || '—'} شهر`],
+              ['نوع العقد', contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`],
               ['فترة الدفع', INTERVAL_LABELS[contract.payment_frequency]?.split('(')[0].trim() || paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency],
               ['السعر الشهري', contract.monthly_rate ? formatCurrency(contract.monthly_rate) : '—'],
-              ['قيمة الدفعة', contract.price_per_period ? formatCurrency(contract.price_per_period) : '—'],
+              ['قيمة الدفعة', contract.price_per_period ? formatCurrency(contract.price_per_period) : (contract.is_open ? formatCurrency(contract.monthly_rate * INTERVAL_MONTHS[contract.payment_frequency]) : '—')],
               ['تاريخ البداية', formatDate(contract.start_date)],
-              ['تاريخ النهاية', formatDate(contract.end_date)],
+              ['تاريخ النهاية', contract.is_open ? 'بدون نهاية' : formatDate(contract.end_date)],
             ].map(([k, v]) => (
               <div key={k}>
                 <p className="text-xs text-muted-foreground">{k}</p>
@@ -599,17 +626,46 @@ export default function ContractDetail() {
                 </SelectContent>
               </Select>
             </FormField>
+
+            {/* Open Contract Toggle */}
+            <div className="sm:col-span-2 flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+              <input
+                type="checkbox"
+                id="edit_is_open"
+                checked={editContractForm.is_open || false}
+                onChange={e => {
+                  const checked = e.target.checked
+                  setEditContractForm({...editContractForm, is_open: checked})
+                  updateEndDate(editContractForm.start_date, editContractForm.duration_months, editContractForm.monthly_rate, editContractForm.payment_frequency, checked)
+                }}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <label htmlFor="edit_is_open" className="text-sm font-medium text-foreground cursor-pointer">
+                عقد مفتوح (بدون تاريخ نهاية)
+              </label>
+            </div>
+
             <FormField label="تاريخ البداية" error={editFormErrors.start_date}>
-              <DateInput value={editContractForm.start_date} onChange={e => { setEditContractForm({...editContractForm, start_date: e.target.value}); updateEndDate(e.target.value, editContractForm.duration_months, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
+              <DateInput value={editContractForm.start_date} onChange={e => { setEditContractForm({...editContractForm, start_date: e.target.value}); updateEndDate(e.target.value, editContractForm.duration_months, editContractForm.monthly_rate, editContractForm.payment_frequency, editContractForm.is_open) }} />
             </FormField>
-            <FormField label="مدة العقد (أشهر)" error={editFormErrors.duration_months}>
-              <Input type="number" value={editContractForm.duration_months} min="1" onChange={e => { setEditContractForm({...editContractForm, duration_months: e.target.value}); updateEndDate(editContractForm.start_date, e.target.value, editContractForm.monthly_rate, editContractForm.payment_frequency) }} />
-            </FormField>
-            <FormField label="تاريخ النهاية">
-              <DateInput value={editContractForm.end_date} readOnly className="bg-muted cursor-not-allowed" />
-            </FormField>
+            {!editContractForm.is_open && (
+              <FormField label="مدة العقد (أشهر)" error={editFormErrors.duration_months}>
+                <Input type="number" value={editContractForm.duration_months} min="1" onChange={e => { setEditContractForm({...editContractForm, duration_months: e.target.value}); updateEndDate(editContractForm.start_date, e.target.value, editContractForm.monthly_rate, editContractForm.payment_frequency, editContractForm.is_open) }} />
+              </FormField>
+            )}
+            {!editContractForm.is_open && (
+              <FormField label="تاريخ النهاية">
+                <DateInput value={editContractForm.end_date} readOnly className="bg-muted cursor-not-allowed" />
+              </FormField>
+            )}
+            {editContractForm.is_open && (
+              <div className="sm:col-span-2 p-3 rounded-xl border border-info/30 bg-info/5">
+                <p className="text-sm text-info font-medium">✓ عقد مفتوح - لا يوجد تاريخ انتهاء</p>
+                <p className="text-xs text-muted-foreground mt-1">سينتهي العقد فقط عند تغيير نوعه أو إنهائه يدوياً</p>
+              </div>
+            )}
             <FormField label="فترة الدفع">
-              <Select value={editContractForm.payment_frequency} onValueChange={v => { setEditContractForm({...editContractForm, payment_frequency: v}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, editContractForm.monthly_rate, v) }}>
+              <Select value={editContractForm.payment_frequency} onValueChange={v => { setEditContractForm({...editContractForm, payment_frequency: v}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, editContractForm.monthly_rate, v, editContractForm.is_open) }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(INTERVAL_LABELS).map(([key, label]) => (
@@ -619,14 +675,27 @@ export default function ContractDetail() {
               </Select>
             </FormField>
             <FormField label="السعر الشهري (جنيه)" error={editFormErrors.monthly_rate}>
-              <Input type="number" value={editContractForm.monthly_rate} onChange={e => { setEditContractForm({...editContractForm, monthly_rate: e.target.value}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, e.target.value, editContractForm.payment_frequency) }} />
+              <Input type="number" value={editContractForm.monthly_rate} onChange={e => { setEditContractForm({...editContractForm, monthly_rate: e.target.value}); updateEndDate(editContractForm.start_date, editContractForm.duration_months, e.target.value, editContractForm.payment_frequency, editContractForm.is_open) }} />
             </FormField>
-            <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[editContractForm.payment_frequency]?.split('(')[0].trim() || '—'})`}>
-              <Input type="number" value={editContractForm.price_per_period} readOnly className="bg-muted cursor-not-allowed font-bold text-success" />
-            </FormField>
-            <FormField label="القيمة الإجمالية">
-              <Input type="number" value={editContractForm.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
-            </FormField>
+            {!editContractForm.is_open && (
+              <>
+                <FormField label={`قيمة الدفعة (${INTERVAL_LABELS[editContractForm.payment_frequency]?.split('(')[0].trim() || '—'})`}>
+                  <Input type="number" value={editContractForm.price_per_period} readOnly className="bg-muted cursor-not-allowed font-bold text-success" />
+                </FormField>
+                <FormField label="القيمة الإجمالية">
+                  <Input type="number" value={editContractForm.total_value} readOnly className="bg-muted cursor-not-allowed font-bold text-lg" />
+                </FormField>
+              </>
+            )}
+            {editContractForm.is_open && (
+              <FormField label={`السعر للدفعة الواحدة (${INTERVAL_LABELS[editContractForm.payment_frequency]?.split('(')[0].trim() || '—'})`}>
+                <div className="h-10 px-3 flex items-center bg-muted/50 rounded-lg border border-border text-sm">
+                  <span className="font-bold text-success">
+                    {formatCurrency((parseFloat(editContractForm.monthly_rate) || 0) * (INTERVAL_MONTHS[editContractForm.payment_frequency] || 1))}
+                  </span>
+                </div>
+              </FormField>
+            )}
             <FormField label="ملاحظات" className="sm:col-span-2">
               <Textarea value={editContractForm.notes} onChange={e => setEditContractForm({...editContractForm, notes: e.target.value})} rows={3} />
             </FormField>

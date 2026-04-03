@@ -37,7 +37,7 @@ export default function Dashboard() {
         { data: maintenanceRecords },
       ] = await Promise.all([
         supabase.from('stands').select('id, code, address, gov_rental_end, gov_license_number, is_active'),
-        supabase.from('contracts').select('id, stand_id, total_value, status, end_date, start_date, duration_months, payment_frequency, stands(code, address), clients(name)'),
+        supabase.from('contracts').select('id, stand_id, total_value, status, end_date, start_date, duration_months, payment_frequency, monthly_rate, is_open, stands(code, address), clients(name)'),
         supabase.from('contracts').select('id, stand_id, total_value, status').eq('status', 'active'),
         supabase.from('payments').select('id, contract_id, amount, payment_date, contracts(stands(code))').order('payment_date', { ascending: false }),
         supabase.from('maintenance_records').select('id, cost, is_paid, date'),
@@ -66,25 +66,50 @@ export default function Dashboard() {
         ;(allPayments || []).forEach(p => {
           paidMap[p.contract_id] = (paidMap[p.contract_id] || 0) + safeNum(p.amount)
         })
-        owed = (activeContracts || []).reduce((acc, c) => {
+
+        // Calculate total value per contract (handle open contracts)
+        const INTERVAL_FOR_TOTAL = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+        const nowForTotal = new Date()
+        function getContractTotalValue(c) {
+          if (c.is_open) {
+            if (!c.start_date || !c.monthly_rate) return paidMap[c.id] || 0
+            const start = new Date(c.start_date)
+            const end = c.end_date ? new Date(c.end_date) : null
+            const nowCapped = end && nowForTotal > end ? end : nowForTotal
+            const intervalMonths = INTERVAL_FOR_TOTAL[c.payment_frequency || 'monthly'] || 1
+            const periodRate = safeNum(c.monthly_rate) * intervalMonths
+            const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+            const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+            const periodsDue = Math.ceil(completeMonths / intervalMonths)
+            return periodsDue * periodRate
+          }
+          return safeNum(c.total_value)
+        }
+
+        owed = (allContracts || []).reduce((acc, c) => {
           const paid = paidMap[c.id] || 0
-          return acc + Math.max(0, safeNum(c.total_value) - paid)
+          return acc + Math.max(0, getContractTotalValue(c) - paid)
         }, 0)
-        overpaid = (activeContracts || []).reduce((acc, c) => {
+        overpaid = (allContracts || []).reduce((acc, c) => {
           const paid = paidMap[c.id] || 0
-          return acc + Math.max(0, paid - safeNum(c.total_value))
+          return acc + Math.max(0, paid - getContractTotalValue(c))
         }, 0)
         // What is due right now based on payment cycle (quarterly, monthly, etc.)
         // A period is considered due once its interval has fully passed.
         // e.g. quarterly from Sep 9: Sep 9-Dec 8 (period 1), Dec 9-Mar 8 (period 2), etc.
         const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
         const now = new Date()
-        periodDue = ((allContracts || [])).filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active').reduce((acc, c) => {
+        periodDue = ((allContracts || [])).reduce((acc, c) => {
           const paid = paidMap[c.id] || 0
-          if (!c.start_date || !c.payment_frequency) return acc
+          if (!c.start_date) return acc
+          const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+          if (realStatus === 'upcoming') return acc
+          // Default to monthly if payment_frequency is not set
+          const paymentFreq = c.payment_frequency || 'monthly'
           const start = new Date(c.start_date)
-          const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-          const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+          // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+          const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+          const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
           const periodRate = monthlyRate * intervalMonths
 
           // Cap "now" at contract end date — can't owe for future portions beyond contract life
@@ -99,10 +124,15 @@ export default function Dashboard() {
             + (nowCapped.getMonth() - start.getMonth())
           const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
 
-          // How many periods are due — use ceil so partially-elapsed periods count as due
-          // e.g. 7 months quarterly → ceil(7/3) = 3 periods due (Sep-Nov, Dec-Feb, Mar-May)
-          const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-          const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+          let periodsDue
+          if (c.is_open) {
+            periodsDue = Math.ceil(completeMonths / intervalMonths)
+          } else {
+            // How many periods are due — use ceil so partially-elapsed periods count as due
+            // e.g. 7 months quarterly → ceil(7/3) = 3 periods due (Sep-Nov, Dec-Feb, Mar-May)
+            const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+            periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+          }
           const amountDue = periodsDue * periodRate
           const overdue = Math.max(0, amountDue - paid)
           return acc + overdue
@@ -226,7 +256,7 @@ export default function Dashboard() {
       <PageHeader title="لوحة التحكم" description="نظرة عامة على أداء الشركة" />
 
       {/* Stats Row 1 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard title="إجمالي اللوحات" value={stats.total} icon={Building2} variant="default"  />
         <StatCard title="لوحات مؤجرة" value={stats.rented} icon={CheckCircle} variant="success" />
         <StatCard title="لوحات متاحة" value={stats.available} icon={Building2} variant="info" />
@@ -234,7 +264,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Row 2 */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard title="إجمالي الإيرادات" value={formatCurrency(stats.totalRevenue)} icon={TrendingUp} variant="success" />
         <StatCard title="صافي الربح" value={formatCurrency(stats.totalRevenue - stats.paidMaintenance)} icon={TrendingUp} variant="default" />
         <StatCard title="مستحق الآن" value={formatCurrency(stats.periodDue)} icon={CreditCard} variant="danger" />

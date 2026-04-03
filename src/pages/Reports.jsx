@@ -100,27 +100,60 @@ export default function Reports() {
 
     const contractsList = contracts || []
     const total = contractsList.length
-    const totalValue = contractsList.reduce((a, c) => a + safeNum(c.total_value), 0)
+
+    // totalValue: handle open contracts by calculating elapsed period value
+    const INTERVAL_FOR_TOTAL = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+    const nowForTotal = new Date()
+    const totalValue = contractsList.reduce((a, c) => {
+      if (c.is_open) {
+        if (!c.start_date || !c.monthly_rate) {
+          const paid = (c.payments || []).reduce((b, p) => b + safeNum(p.amount), 0)
+          return a + paid
+        }
+        const start = new Date(c.start_date)
+        const end = c.end_date ? new Date(c.end_date) : null
+        const nowCapped = end && nowForTotal > end ? end : nowForTotal
+        const intervalMonths = INTERVAL_FOR_TOTAL[c.payment_frequency || 'monthly'] || 1
+        const periodRate = safeNum(c.monthly_rate) * intervalMonths
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+        const periodsDue = Math.ceil(completeMonths / intervalMonths)
+        return a + (periodsDue * periodRate)
+      }
+      return a + safeNum(c.total_value)
+    }, 0)
     const totalPaid = contractsList.reduce((a, c) =>
       a + (c.payments || []).reduce((b, p) => b + safeNum(p.amount), 0), 0)
     const totalOwed = Math.max(0, totalValue - totalPaid)
 
-    // Period-based amount due across active contracts in this report's scope
+    // Period-based amount due across ALL contracts (not just active)
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
-    const periodDue = contractsList.filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active').reduce((acc, c) => {
-      if (!c.start_date || !c.payment_frequency) return acc
+    const periodDue = contractsList.reduce((acc, c) => {
+      if (!c.start_date) return acc
+      const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+      if (realStatus === 'upcoming') return acc
+      // Default to monthly if payment_frequency is not set
+      const paymentFreq = c.payment_frequency || 'monthly'
       const start = new Date(c.start_date)
+      // Cap at end_date for terminated/expired contracts
       const end = c.end_date ? new Date(c.end_date) : null
       const nowCapped = end && now > end ? end : now
-      const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-      const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+      // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+      const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+      const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
       const periodRate = monthlyRate * intervalMonths
       const paid = (c.payments || []).reduce((b, p) => b + safeNum(p.amount), 0)
       const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
       const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-      const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-      const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+      let periodsDue
+      if (c.is_open) {
+        periodsDue = Math.ceil(completeMonths / intervalMonths)
+      } else {
+        const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+        periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+      }
       return acc + Math.max(0, periodsDue * periodRate - paid)
     }, 0)
 
@@ -161,21 +194,49 @@ export default function Reports() {
   async function exportCtExcel() {
     const rows = (ctData?.contracts || []).map(c => {
       const paid = (c.payments || []).reduce((a, p) => a + safeNum(p.amount), 0)
+
+      // Calculate contract total value (handle open contracts)
+      let contractTotalValue
+      if (c.is_open) {
+        if (!c.start_date || !c.monthly_rate) {
+          contractTotalValue = paid
+        } else {
+          const start = new Date(c.start_date)
+          const end = c.end_date ? new Date(c.end_date) : null
+          const nowCapped = end && new Date() > end ? end : new Date()
+          const intervalMonths = ({ monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 })[c.payment_frequency || 'monthly'] || 1
+          const periodRate = safeNum(c.monthly_rate) * intervalMonths
+          const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+          const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+          const periodsDue = Math.ceil(completeMonths / intervalMonths)
+          contractTotalValue = periodsDue * periodRate
+        }
+      } else {
+        contractTotalValue = safeNum(c.total_value)
+      }
+
       let periodDue = 0
       const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
-      if (realStatus === 'active' && c.start_date && c.payment_frequency) {
+      if (c.start_date && realStatus !== 'upcoming') {
         const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
         const now = new Date()
         const start = new Date(c.start_date)
+        const paymentFreq = c.payment_frequency || 'monthly'
         const end = c.end_date ? new Date(c.end_date) : null
         const nowCapped = end && now > end ? end : now
-        const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-        const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+        const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+        const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
         const periodRate = monthlyRate * intervalMonths
         const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
         const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-        const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-        const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+        let periodsDue
+        if (c.is_open) {
+          periodsDue = Math.ceil(completeMonths / intervalMonths)
+        } else {
+          const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+          periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+        }
         periodDue = Math.max(0, periodsDue * periodRate - paid)
       }
       return {
@@ -184,10 +245,10 @@ export default function Reports() {
         'مدة العقد (شهر)': c.duration_months || '—',
         'البداية': formatDate(c.start_date),
         'النهاية': formatDate(c.end_date),
-        'القيمة (جنيه)': safeNum(c.total_value),
+        'القيمة (جنيه)': c.is_open ? '—' : safeNum(c.total_value),
         'المدفوع (جنيه)': paid,
         'مستحق الآن (جنيه)': periodDue,
-        'الباقي على العقد (جنيه)': Math.max(0, safeNum(c.total_value) - paid),
+        'الباقي على العقد (جنيه)': Math.max(0, contractTotalValue - paid),
         'الحالة': statusLabels[c.status] || c.status,
       }
     })
@@ -316,7 +377,7 @@ export default function Reports() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>اللوحة</TableHead><TableHead>العنوان</TableHead><TableHead>العميل</TableHead><TableHead>المدة</TableHead>
-                      <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة</TableHead>
+                      <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة الإجمالية</TableHead>
                       <TableHead>المدفوع</TableHead><TableHead>مستحق الآن</TableHead><TableHead>الحالة</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -324,20 +385,48 @@ export default function Reports() {
                     {(ctData?.contracts || []).map(c => {
                       const paid = (c.payments||[]).reduce((a,p) => a+safeNum(p.amount),0)
                       const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+
+                      // Calculate contract total value (handle open contracts)
+                      let contractTotalValue
+                      if (c.is_open) {
+                        if (!c.start_date || !c.monthly_rate) {
+                          contractTotalValue = paid
+                        } else {
+                          const start = new Date(c.start_date)
+                          const end = c.end_date ? new Date(c.end_date) : null
+                          const nowCapped = end && new Date() > end ? end : new Date()
+                          const intervalMonths = ({ monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 })[c.payment_frequency || 'monthly'] || 1
+                          const periodRate = safeNum(c.monthly_rate) * intervalMonths
+                          const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                          const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+                          const periodsDue = Math.ceil(completeMonths / intervalMonths)
+                          contractTotalValue = periodsDue * periodRate
+                        }
+                      } else {
+                        contractTotalValue = safeNum(c.total_value)
+                      }
+
                       let periodDue = 0
-                      if (realStatus === 'active' && c.start_date && c.payment_frequency) {
+                      if (c.start_date && realStatus !== 'upcoming') {
                         const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
                         const now = new Date()
                         const start = new Date(c.start_date)
+                        const paymentFreq = c.payment_frequency || 'monthly'
                         const end = c.end_date ? new Date(c.end_date) : null
                         const nowCapped = end && now > end ? end : now
-                        const monthlyRate = safeNum(c.total_value) / (parseInt(c.duration_months) || 1)
-                        const intervalMonths = INTERVAL_MONTHS[c.payment_frequency] || 1
+                        const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+                        const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
                         const periodRate = monthlyRate * intervalMonths
                         const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
                         const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-                        const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
-                        const periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+
+                        let periodsDue
+                        if (c.is_open) {
+                          periodsDue = Math.ceil(completeMonths / intervalMonths)
+                        } else {
+                          const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+                          periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+                        }
                         periodDue = Math.max(0, periodsDue * periodRate - paid)
                       }
                       return (
@@ -348,8 +437,8 @@ export default function Reports() {
                           <TableCell className="text-sm">{c.duration_months ? `${c.duration_months} شهر` : '—'}</TableCell>
                           <TableCell>{formatDate(c.start_date)}</TableCell>
                           <TableCell>{formatDate(c.end_date)}</TableCell>
-                          <TableCell>{formatCurrency(c.total_value)}</TableCell>
-                          <TableCell className={paid >= safeNum(c.total_value) ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
+                          <TableCell>{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>
+                          <TableCell className={paid >= contractTotalValue ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
                           <TableCell className={periodDue > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>{formatCurrency(periodDue)}</TableCell>
                           <TableCell>
                             <span className={`text-xs font-medium px-2 py-1 rounded-full ${realStatus==='active'?'bg-success/15 text-success':realStatus==='expired'?'bg-destructive/15 text-destructive':realStatus==='terminated'?'bg-muted text-muted-foreground':'bg-primary/15 text-primary'}`}>

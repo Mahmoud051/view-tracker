@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, MapPin, Calendar, User, Ruler } from 'lucide-react'
+import { Plus, Search, Building2, MapPin, Calendar, User, Ruler, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { cn, formatDate, formatCurrency, computeGovStatus, computeContractStatus, todayStr } from '@/lib/utils'
+import { cn, formatDate, formatCurrency, computeGovStatus, computeContractStatus, todayStr, safeNum, paymentIntervalMonths } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,9 @@ const buildEmptyForm = () => ({
   gov_license_number: '', gov_rental_start: todayStr(), gov_rental_end: '', gov_rental_cost: '',
 })
 
+const MEASUREMENT_INPUT_PATTERN = /^\d*(\.\d?)?$/
+const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d)?$/
+
 export default function Stands() {
   const [stands, setStands] = useState([])
   const [contracts, setContracts] = useState([])
@@ -30,6 +33,7 @@ export default function Stands() {
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [photoFile, setPhotoFile] = useState(null)
+  const [paymentsMap, setPaymentsMap] = useState({})
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -37,12 +41,16 @@ export default function Stands() {
 
   async function fetchData() {
     setLoading(true)
-    const [{ data: s }, { data: c }] = await Promise.all([
+    const [{ data: s }, { data: c }, { data: pmts }] = await Promise.all([
       supabase.from('stands').select('*').order('created_at', { ascending: false }),
-      supabase.from('contracts').select('stand_id, status, start_date, end_date, total_value, duration_months, payment_frequency, clients(name, phone)').in('status', ['active', 'upcoming']),
+      supabase.from('contracts').select('id, stand_id, status, start_date, end_date, total_value, duration_months, payment_frequency, monthly_rate, is_open, clients(name, phone)').in('status', ['active', 'upcoming']),
+      supabase.from('payments').select('contract_id, amount'),
     ])
     setStands(s || [])
     setContracts(c || [])
+    const pm = {}
+    ;(pmts || []).forEach(p => { pm[p.contract_id] = (pm[p.contract_id] || 0) + safeNum(p.amount) })
+    setPaymentsMap(pm)
     setLoading(false)
   }
 
@@ -58,12 +66,17 @@ export default function Stands() {
     return matchSearch && matchStatus
   })
 
+  function updateMeasurement(field, value) {
+    if (!MEASUREMENT_INPUT_PATTERN.test(value)) return
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
   function validateForm() {
     const errs = {}
     if (!form.code.trim()) errs.code = 'كود اللوحة مطلوب'
     if (!form.address.trim()) errs.address = 'العنوان مطلوب'
-    if (!form.width || isNaN(form.width)) errs.width = 'العرض مطلوب'
-    if (!form.height || isNaN(form.height)) errs.height = 'الارتفاع مطلوب'
+    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.width).trim())) errs.width = 'أدخل رقمًا صحيحًا أو منزلة عشرية واحدة فقط مثل 1 أو 1.1'
+    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.height).trim())) errs.height = 'أدخل رقمًا صحيحًا أو منزلة عشرية واحدة فقط مثل 2 أو 2.5'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -216,6 +229,36 @@ export default function Stands() {
                       )
                     }
                     const daysLeft = contract.end_date ? Math.ceil((new Date(contract.end_date) - new Date()) / 86400000) : null
+                    
+                    // Calculate period due amount
+                    let periodDue = 0
+                    const contractStatus = computeContractStatus(contract.start_date, contract.end_date, contract.status)
+                    if (contract.start_date && contractStatus !== 'upcoming') {
+                      const now = new Date()
+                      const start = new Date(contract.start_date)
+                      const paymentFreq = contract.payment_frequency || 'monthly'
+                      const intervalMonths = paymentIntervalMonths[paymentFreq] || 1
+                      const monthlyRate = safeNum(contract.monthly_rate) || (safeNum(contract.total_value) / (parseInt(contract.duration_months) || 1))
+                      const periodRate = monthlyRate * intervalMonths
+
+                      // Cap at end_date for terminated/expired contracts
+                      const end = contract.end_date ? new Date(contract.end_date) : null
+                      const nowCapped = (end && now > end) ? end : now
+
+                      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+                      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+
+                      let periodsDue
+                      if (contract.is_open) {
+                        periodsDue = Math.ceil(completeMonths / intervalMonths)
+                      } else {
+                        const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
+                        periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+                      }
+                      const paid = paymentsMap[contract.id] || 0
+                      periodDue = Math.max(0, periodsDue * periodRate - paid)
+                    }
+                    
                     return (
                       <>
                         <div className="flex items-center gap-1.5">
@@ -232,6 +275,12 @@ export default function Stands() {
                             </span>
                           )}
                         </div>
+                        {periodDue > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Wallet className="w-3.5 h-3.5 flex-shrink-0 text-destructive" />
+                            <p className="text-xs font-medium text-destructive">مستحق: {formatCurrency(periodDue)}</p>
+                          </div>
+                        )}
                       </>
                     )
                   })()}
@@ -265,10 +314,10 @@ export default function Stands() {
               <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="العنوان الكامل للموقع" />
             </FormField>
             <FormField label="الطول (متر)" required error={formErrors.width}>
-              <Input type="number" value={form.width} onChange={e => setForm({ ...form, width: e.target.value })} placeholder="0" />
+              <Input type="text" inputMode="decimal" value={form.width} onChange={e => updateMeasurement('width', e.target.value)} placeholder="0" />
             </FormField>
             <FormField label="العرض (متر)" required error={formErrors.height}>
-              <Input type="number" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} placeholder="0" />
+              <Input type="text" inputMode="decimal" value={form.height} onChange={e => updateMeasurement('height', e.target.value)} placeholder="0" />
             </FormField>
             <FormField label="عدد الأوجه">
               <Select value={form.sides} onValueChange={v => setForm({ ...form, sides: v })}>
