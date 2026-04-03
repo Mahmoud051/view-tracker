@@ -1021,7 +1021,7 @@ export default function StandDetail() {
 
       {/* Change Government Rent Dialog */}
       <Dialog open={changeRentDialogOpen} onOpenChange={setChangeRentDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl" description="سيتم احتساب الإيجار الجديد من تاريخ البداية المحدد">
           <DialogHeader><DialogTitle>تغيير الإيجار الحكومي الشهري</DialogTitle></DialogHeader>
           <div className="p-6 space-y-4">
             <div className="bg-info/5 border border-info/20 rounded-xl px-4 py-3 text-sm">
