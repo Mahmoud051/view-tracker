@@ -266,55 +266,51 @@ export default function Dashboard() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="لوحة التحكم" description="نظرة عامة على أداء الشركة" />
 
-      {/* Stats Row 1 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard title="إجمالي اللوحات" value={stats.total} icon={Building2} variant="default"  />
+      {/* Section 1: Stand & Contract Overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard title="إجمالي اللوحات" value={stats.total} icon={Building2} variant="default" />
         <StatCard title="لوحات مؤجرة" value={stats.rented} icon={CheckCircle} variant="success" />
         <StatCard title="لوحات متاحة" value={stats.available} icon={Building2} variant="info" />
         <StatCard title="إجمالي العقود" value={stats.totalContracts} icon={FileText} variant="default" />
       </div>
 
-      {/* Stats Row 2 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* Section 2: Financial Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatCard title="إجمالي الإيرادات" value={formatCurrency(stats.totalRevenue)} icon={TrendingUp} variant="success" />
-        <StatCard title="الإيجار الحكومي" value={formatCurrency(stats.govRent)} icon={Building2} variant={stats.govRent > 0 ? 'warning' : 'default'} />
         <StatCard title="صافي الربح" value={formatCurrency(stats.netProfit)} icon={TrendingUp} variant={stats.netProfit >= 0 ? 'success' : 'danger'} />
         <StatCard title="مستحق الآن" value={formatCurrency(stats.periodDue)} icon={CreditCard} variant="danger" />
         <StatCard title="الباقي على العقود" value={formatCurrency(stats.owed)} icon={CreditCard} variant="info" />
-      </div>
-
-      {/* Additional Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatCard title="الإيجار الحكومي" value={formatCurrency(stats.govRent)} icon={Building2} variant={stats.govRent > 0 ? 'warning' : 'default'} />
         <StatCard title="صيانة غير مدفوعة" value={formatCurrency(stats.unpaidMaintenance)} icon={Wrench} variant="warning" />
       </div>
 
-      {/* Alerts */}
+      {/* Alerts — compact horizontal layout */}
       {(govAlerts.length > 0 || contractAlerts.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {govAlerts.length > 0 && (
             <Card className="border-warning/40 bg-warning/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-warning flex flex-reverse items-center gap-2 text-base">
-                  <Bell className="w-5 h-5" />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-warning flex flex-reverse items-center gap-2 text-sm">
+                  <Bell className="w-4 h-4" />
                   تراخيص حكومية تنتهي قريباً ({govAlerts.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {govAlerts.slice(0, 5).map(s => {
+              <CardContent className="space-y-1.5">
+                {govAlerts.slice(0, 3).map(s => {
                   const days = daysRemaining(s.gov_rental_end)
                   return (
                     <button
                       key={s.id}
                       onClick={() => navigate(`/stands/${s.id}`)}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-background/60 hover:bg-background transition-colors border border-border/50 text-start"
+                      className="w-full flex items-center justify-between p-2.5 rounded-lg bg-background/60 hover:bg-background transition-colors border border-border/50 text-start"
                     >
                       <div>
-                        <p className="font-semibold text-sm text-foreground">{s.code}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[180px]">{s.address}</p>
+                        <p className="font-semibold text-xs text-foreground">{s.code}</p>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[160px]">{s.address}</p>
                       </div>
                       <div className="text-end flex-shrink-0">
-                        <p className="text-xs font-medium text-warning">{days} يوم متبقي</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(s.gov_rental_end)}</p>
+                        <p className="text-[10px] font-medium text-warning">{days} يوم</p>
+                        <p className="text-[10px] text-muted-foreground">{formatDate(s.gov_rental_end)}</p>
                       </div>
                     </button>
                   )
@@ -325,28 +321,28 @@ export default function Dashboard() {
 
           {contractAlerts.length > 0 && (
             <Card className="border-destructive/40 bg-destructive/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-destructive flex flex-reverse items-center gap-2 text-base">
-                  <AlertCircle className="w-5 h-5" />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-destructive flex flex-reverse items-center gap-2 text-sm">
+                  <AlertCircle className="w-4 h-4" />
                   عقود تنتهي قريباً ({contractAlerts.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {contractAlerts.slice(0, 5).map(c => {
+              <CardContent className="space-y-1.5">
+                {contractAlerts.slice(0, 3).map(c => {
                   const days = daysRemaining(c.end_date)
                   return (
                     <button
                       key={c.id}
                       onClick={() => navigate(`/contracts/${c.id}`)}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-background/60 hover:bg-background transition-colors border border-border/50 text-start"
+                      className="w-full flex items-center justify-between p-2.5 rounded-lg bg-background/60 hover:bg-background transition-colors border border-border/50 text-start"
                     >
                       <div>
-                        <p className="font-semibold text-sm text-foreground">{c.clients?.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.stands?.code} — {c.stands?.address?.slice(0, 30)}</p>
+                        <p className="font-semibold text-xs text-foreground">{c.clients?.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{c.stands?.code} — {c.stands?.address?.slice(0, 25)}</p>
                       </div>
                       <div className="text-end flex-shrink-0">
-                        <p className="text-xs font-medium text-destructive">{days} يوم متبقي</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(c.end_date)}</p>
+                        <p className="text-[10px] font-medium text-destructive">{days} يوم</p>
+                        <p className="text-[10px] text-muted-foreground">{formatDate(c.end_date)}</p>
                       </div>
                     </button>
                   )
@@ -357,138 +353,113 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue bar chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              الإيرادات — آخر 6 أشهر
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={chartTooltip} />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات</div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Section 3: Revenue Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-reverse items-center gap-2 text-base">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            الإيرادات — آخر 6 أشهر
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                <Tooltip content={chartTooltip} />
+                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات</div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Stand status pie */}
+      {/* Section 4: Status + Recent Activity */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3">
+        {/* Stand status */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
-              <PieChartIcon className="w-5 h-5 text-primary" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+              <PieChartIcon className="w-4 h-4 text-primary" />
               حالة اللوحات
             </CardTitle>
           </CardHeader>
           <CardContent>
             {standStatusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={160}>
                 <PieChart>
-                  <Pie
-                    data={standStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
+                  <Pie data={standStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
                     {standStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip content={pieTooltip} />
-                  <Legend
-                    formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
-                    wrapperStyle={{ fontSize: '12px' }}
-                  />
+                  <Legend formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>} wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات</div>
+              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-xs">لا توجد بيانات</div>
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Second charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Contract status pie */}
+        {/* Contract status */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
-              <FileText className="w-5 h-5 text-primary" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+              <FileText className="w-4 h-4 text-primary" />
               حالة العقود
             </CardTitle>
           </CardHeader>
           <CardContent>
             {contractStatusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={160}>
                 <PieChart>
-                  <Pie
-                    data={contractStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
+                  <Pie data={contractStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
                     {contractStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip content={pieTooltip} />
-                  <Legend
-                    formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
-                    wrapperStyle={{ fontSize: '12px' }}
-                  />
+                  <Legend formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>} wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">لا توجد بيانات</div>
+              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-xs">لا توجد بيانات</div>
             )}
           </CardContent>
         </Card>
 
         {/* Recent payments */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-reverse items-center gap-2 text-base">
-              <CreditCard className="w-5 h-5 text-primary" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+              <CreditCard className="w-4 h-4 text-primary" />
               آخر المدفوعات
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentPayments.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {recentPayments.map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50">
+                  <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/50">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{formatCurrency(p.amount)}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(p.payment_date)}</p>
+                      <p className="text-xs font-medium text-foreground">{formatCurrency(p.amount)}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDate(p.payment_date)}</p>
                     </div>
                     <div className="text-end">
-                      <p className="text-xs font-medium text-success">مدفوع</p>
-                      <p className="text-xs text-muted-foreground">{p.contracts?.stands?.code || '—'}</p>
+                      <p className="text-[10px] font-medium text-success">مدفوع</p>
+                      <p className="text-[10px] text-muted-foreground">{p.contracts?.stands?.code || '—'}</p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-sm">لا توجد مدفوعات</div>
+              <div className="h-[130px] flex items-center justify-center text-muted-foreground text-xs">لا توجد مدفوعات</div>
             )}
           </CardContent>
         </Card>

@@ -121,31 +121,31 @@ export function LoadingScreen() {
 // ---- StatCard ----
 export function StatCard({ title, value, icon: Icon, description, variant = 'default', className }) {
   const variants = {
-    default: 'border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card',
-    success: 'border-success/20 bg-gradient-to-br from-success/10 via-card to-card',
-    warning: 'border-warning/20 bg-gradient-to-br from-warning/10 via-card to-card',
-    danger: 'border-destructive/20 bg-gradient-to-br from-destructive/10 via-card to-card',
-    info: 'border-info/20 bg-gradient-to-br from-info/10 via-card to-card',
+    default: 'border-primary/20 bg-card',
+    success: 'border-success/30 bg-success/5',
+    warning: 'border-warning/30 bg-warning/5',
+    danger: 'border-destructive/30 bg-destructive/5',
+    info: 'border-info/30 bg-info/5',
   }
   const iconVariants = {
-    default: 'bg-primary/15 text-primary ring-1 ring-primary/15',
-    success: 'bg-success/15 text-success ring-1 ring-success/20',
-    warning: 'bg-warning/15 text-warning ring-1 ring-warning/20',
-    danger: 'bg-destructive/15 text-destructive ring-1 ring-destructive/20',
-    info: 'bg-info/15 text-info ring-1 ring-info/20',
+    default: 'bg-primary/10 text-primary',
+    success: 'bg-success/10 text-success',
+    warning: 'bg-warning/10 text-warning',
+    danger: 'bg-destructive/10 text-destructive',
+    info: 'bg-info/10 text-info',
   }
   return (
-    <Card className={cn('overflow-hidden rounded-2xl shadow-sm card-hover', variants[variant] || variants.default, className)}>
-      <CardContent className="flex min-h-[110px] flex-row-reverse items-start gap-3 p-4 text-right">
+    <Card className={cn('overflow-hidden rounded-xl shadow-sm card-hover', variants[variant] || variants.default, className)}>
+      <CardContent className="flex flex-row-reverse items-center gap-3 p-4">
         {Icon && (
-          <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', iconVariants[variant] || iconVariants.default)}>
-            <Icon className="h-5 w-5" />
+          <div className={cn('flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg', iconVariants[variant] || iconVariants.default)}>
+            <Icon className="h-4 w-4" />
           </div>
         )}
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="truncate text-xs font-medium text-muted-foreground">{title}</p>
-          <p className="break-words text-xl font-bold leading-tight text-foreground">{value}</p>
-          {description && <p className="text-[10px] text-muted-foreground">{description}</p>}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-medium text-muted-foreground leading-tight">{title}</p>
+          <p className="mt-0.5 break-words text-lg font-bold text-foreground leading-tight">{value}</p>
+          {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
         </div>
       </CardContent>
     </Card>

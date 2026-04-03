@@ -56,7 +56,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-primary shadow-2xl mb-5 mx-auto">
             <span className="text-4xl font-black text-primary-foreground">V</span>
           </div>
-          <h1 className="text-4xl font-black text-foreground tracking-tight">View</h1>
+          <h1 className="text-4xl font-black text-foreground tracking-tight">ڤيو</h1>
           <p className="text-muted-foreground mt-2 text-sm">نظام إدارة اللوحات الإعلانية</p>
         </div>
 
@@ -125,7 +125,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          View Billboard Management System © {new Date().getFullYear()}
+          ڤيو © {new Date().getFullYear()}
         </p>
       </div>
     </div>

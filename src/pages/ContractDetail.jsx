@@ -325,7 +325,7 @@ export default function ContractDetail() {
 </head>
 <body>
   <div class="header">
-    <div class="company">View</div>
+    <div class="company">ڤيو</div>
     <div class="subtitle">نظام إدارة اللوحات الإعلانية</div>
     <div style="font-size:13px;color:#64748b;margin-top:6px;">عقد إيجار رقم: ${contractSerial(contract.id)}</div>
     <div style="font-size:12px;color:#94a3b8;">تاريخ الطباعة: ${formatDate(new Date().toISOString())}</div>
@@ -371,9 +371,9 @@ export default function ContractDetail() {
 
   <div class="sig-grid">
     <div class="sig-box">توقيع العميل<br/>${contract.clients?.name}</div>
-    <div class="sig-box">توقيع الشركة<br/>View</div>
+    <div class="sig-box">توقيع الشركة<br/>ڤيو</div>
   </div>
-  <div class="footer">View — نظام إدارة اللوحات الإعلانية © ${new Date().getFullYear()}</div>
+  <div class="footer">ڤيو — نظام إدارة اللوحات الإعلانية © ${new Date().getFullYear()}</div>
 </body>
 </html>`
 

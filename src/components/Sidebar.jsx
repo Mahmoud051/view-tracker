@@ -40,7 +40,7 @@ function SidebarContent({ onClose, className }) {
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg">
             <Eye className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-black text-foreground tracking-tight">View</span>
+          <span className="text-xl font-black text-foreground tracking-tight">ڤيو</span>
         </div>
         <button
           onClick={onClose}
@@ -126,7 +126,7 @@ export function MobileHeader({ onMenuOpen }) {
         <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
           <Eye className="w-4 h-4 text-primary-foreground" />
         </div>
-        <span className="font-black text-foreground">View</span>
+        <span className="font-black text-foreground">ڤيو</span>
       </div>
       <div className="w-8" />
     </header>
