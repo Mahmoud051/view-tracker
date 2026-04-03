@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, Users, CheckCircle, AlertCircle, TrendingUp, Bell, FileText, PieChart as PieChartIcon, Wrench, CreditCard } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, daysRemaining, getLast6MonthsLabels, safeNum, toLocalDateStr, computeContractStatus } from '@/lib/utils'
+import { formatDate, formatCurrency, daysRemaining, getLast6MonthsLabels, safeNum, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod, getCurrentMonthlyGovRent } from '@/lib/utils'
 import { StatCard, LoadingScreen, PageHeader } from '@/components/ui/shared'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: 0, rented: 0, available: 0, owed: 0, overpaid: 0, periodDue: 0, totalContracts: 0, totalRevenue: 0, paidMaintenance: 0, unpaidMaintenance: 0 })
+  const [stats, setStats] = useState({ total: 0, rented: 0, available: 0, owed: 0, overpaid: 0, periodDue: 0, totalContracts: 0, totalRevenue: 0, paidMaintenance: 0, unpaidMaintenance: 0, govRent: 0, netProfit: 0 })
   const [govAlerts, setGovAlerts] = useState([])
   const [contractAlerts, setContractAlerts] = useState([])
   const [chartData, setChartData] = useState([])
@@ -27,6 +27,7 @@ export default function Dashboard() {
     try {
       const today = toLocalDateStr(new Date())
       const in30 = toLocalDateStr(new Date(Date.now() + 30 * 86400000))
+      const sixMonthsAgo = toLocalDateStr(new Date(Date.now() - 180 * 86400000))
 
       // Fetch all needed data in parallel
       const [
@@ -35,12 +36,14 @@ export default function Dashboard() {
         { data: activeContracts },
         { data: allPayments },
         { data: maintenanceRecords },
+        { data: allGovRentalHistory },
       ] = await Promise.all([
         supabase.from('stands').select('id, code, address, gov_rental_end, gov_license_number, is_active'),
         supabase.from('contracts').select('id, stand_id, total_value, status, end_date, start_date, duration_months, payment_frequency, monthly_rate, is_open, stands(code, address), clients(name)'),
         supabase.from('contracts').select('id, stand_id, total_value, status').eq('status', 'active'),
         supabase.from('payments').select('id, contract_id, amount, payment_date, contracts(stands(code))').order('payment_date', { ascending: false }),
         supabase.from('maintenance_records').select('id, cost, is_paid, date'),
+        supabase.from('gov_rental_history').select('*'),
       ])
 
       const total = (stands || []).length
@@ -150,6 +153,12 @@ export default function Dashboard() {
         .filter(r => !r.is_paid)
         .reduce((a, r) => a + safeNum(r.cost), 0)
 
+      // Government rent - last 6 months
+      const govRentLast6Months = calculateGovRentForPeriod(allGovRentalHistory || [], sixMonthsAgo, today)
+
+      // Net profit = total revenue - maintenance - government rent
+      const netProfit = totalRevenue - paidMaintenance - govRentLast6Months
+
       setStats({
         total,
         rented,
@@ -161,6 +170,8 @@ export default function Dashboard() {
         totalRevenue,
         paidMaintenance,
         unpaidMaintenance,
+        govRent: govRentLast6Months,
+        netProfit,
       })
 
       // Gov alerts
@@ -266,9 +277,14 @@ export default function Dashboard() {
       {/* Stats Row 2 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard title="إجمالي الإيرادات" value={formatCurrency(stats.totalRevenue)} icon={TrendingUp} variant="success" />
-        <StatCard title="صافي الربح" value={formatCurrency(stats.totalRevenue - stats.paidMaintenance)} icon={TrendingUp} variant="default" />
+        <StatCard title="الإيجار الحكومي" value={formatCurrency(stats.govRent)} icon={Building2} variant={stats.govRent > 0 ? 'warning' : 'default'} />
+        <StatCard title="صافي الربح" value={formatCurrency(stats.netProfit)} icon={TrendingUp} variant={stats.netProfit >= 0 ? 'success' : 'danger'} />
         <StatCard title="مستحق الآن" value={formatCurrency(stats.periodDue)} icon={CreditCard} variant="danger" />
         <StatCard title="الباقي على العقود" value={formatCurrency(stats.owed)} icon={CreditCard} variant="info" />
+      </div>
+
+      {/* Additional Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard title="صيانة غير مدفوعة" value={formatCurrency(stats.unpaidMaintenance)} icon={Wrench} variant="warning" />
       </div>
 

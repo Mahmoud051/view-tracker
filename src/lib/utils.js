@@ -202,6 +202,54 @@ export function todayStr() {
   return `${y}-${m}-${day}`
 }
 
+// Calculate government rent cost for a date range given rental history
+// Returns the total government rent cost for the specified period
+export function calculateGovRentForPeriod(history, fromDate, toDate) {
+  if (!history || history.length === 0 || !fromDate || !toDate) return 0
+
+  const from = new Date(fromDate)
+  const to = new Date(toDate)
+  
+  if (from > to) return 0
+
+  // Sort history by start_date
+  const sortedHistory = [...history].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+  
+  let totalRent = 0
+  const dailyRate = 1 / 30 // Will be multiplied by monthly_amount later
+
+  // Iterate through each history entry
+  for (const entry of sortedHistory) {
+    const entryStart = new Date(entry.start_date)
+    const entryEnd = entry.end_date ? new Date(entry.end_date) : to
+    
+    // Calculate the overlap between [from, to] and [entryStart, entryEnd]
+    const overlapStart = from > entryStart ? from : entryStart
+    const overlapEnd = to < entryEnd ? to : entryEnd
+    
+    if (overlapStart <= overlapEnd) {
+      // Calculate days in overlap
+      const days = Math.ceil((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1
+      const monthlyAmount = safeNum(entry.monthly_amount)
+      const dailyAmount = monthlyAmount * dailyRate
+      totalRent += days * dailyAmount
+    }
+  }
+
+  return totalRent
+}
+
+// Calculate current monthly government rent from history
+export function getCurrentMonthlyGovRent(history) {
+  if (!history || history.length === 0) return 0
+  
+  // Sort by start_date descending and get the latest entry without end_date
+  const sortedHistory = [...history].sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+  const currentEntry = sortedHistory.find(entry => !entry.end_date)
+  
+  return currentEntry ? safeNum(currentEntry.monthly_amount) : 0
+}
+
 function setWorksheetColumns(worksheet, rows) {
   const headers = Object.keys(rows[0] || {})
   worksheet.columns = headers.map(header => ({

@@ -6,7 +6,7 @@ import {
   ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr } from '@/lib/utils'
+import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr, getCurrentMonthlyGovRent } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,7 @@ export default function StandDetail() {
   const [stand, setStand] = useState(null)
   const [contracts, setContracts] = useState([])
   const [maintenance, setMaintenance] = useState([])
+  const [govRentalHistory, setGovRentalHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingInfo, setEditingInfo] = useState(false)
   const [editingGov, setEditingGov] = useState(false)
@@ -44,15 +45,18 @@ export default function StandDetail() {
   const [photoFile, setPhotoFile] = useState(null)
   const [editingMaintId, setEditingMaintId] = useState(null)
   const [editingMaintForm, setEditingMaintForm] = useState({ date: '', description: '', cost: '', technician_name: '', is_paid: false })
+  const [changeRentDialogOpen, setChangeRentDialogOpen] = useState(false)
+  const [rentForm, setRentForm] = useState({ monthly_amount: '', start_date: '' })
 
   useEffect(() => { fetchAll() }, [id])
 
   async function fetchAll() {
     setLoading(true)
-    const [{ data: s }, { data: c }, { data: m }] = await Promise.all([
+    const [{ data: s }, { data: c }, { data: m }, { data: govHistory }] = await Promise.all([
       supabase.from('stands').select('*').eq('id', id).single(),
       supabase.from('contracts').select('*, clients(id, name, phone), payments(*)').eq('stand_id', id).order('created_at', { ascending: false }),
       supabase.from('maintenance_records').select('*').eq('stand_id', id).order('date', { ascending: false }),
+      supabase.from('gov_rental_history').select('*').eq('stand_id', id).order('start_date', { ascending: false }),
     ])
     setStand(s)
     setInfoForm({ code: s?.code || '', address: s?.address || '', width: s?.width || '', height: s?.height || '', sides: s?.sides || 1, desc: s?.desc || '' })
@@ -64,6 +68,7 @@ export default function StandDetail() {
     })
     setContracts(c || [])
     setMaintenance(m || [])
+    setGovRentalHistory(govHistory || [])
     setLoading(false)
   }
 
@@ -186,6 +191,53 @@ export default function StandDetail() {
       if (error) throw error
       toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات الترخيص', variant: 'success' })
       setEditingGov(false)
+      fetchAll()
+    } catch (e) { toast({ title: 'خطأ', description: e.message, variant: 'error' }) }
+    setSaving(false)
+  }
+
+  async function handleChangeRent() {
+    if (!rentForm.monthly_amount || !rentForm.start_date) {
+      toast({ title: 'خطأ', description: 'المبلغ وتاريخ البداية مطلوبان', variant: 'error' })
+      return
+    }
+    setSaving(true)
+    try {
+      const today = toLocalDateStr(new Date())
+      // Close the current active entry (if any)
+      const currentEntry = govRentalHistory.find(entry => !entry.end_date)
+      if (currentEntry) {
+        // Set end_date to the day before the new start_date
+        const newStartDate = new Date(rentForm.start_date)
+        const dayBefore = new Date(newStartDate)
+        dayBefore.setDate(dayBefore.getDate() - 1)
+        const endDateStr = toLocalDateStr(dayBefore)
+        
+        const { error } = await supabase
+          .from('gov_rental_history')
+          .update({ end_date: endDateStr })
+          .eq('id', currentEntry.id)
+        if (error) throw error
+      }
+
+      // Create new entry
+      const { error } = await supabase.from('gov_rental_history').insert([{
+        stand_id: id,
+        monthly_amount: parseFloat(rentForm.monthly_amount),
+        start_date: rentForm.start_date,
+        end_date: null,
+        notes: `Changed from ${currentEntry ? safeNum(currentEntry.monthly_amount) : 0} to ${rentForm.monthly_amount}`,
+      }])
+      if (error) throw error
+
+      // Also update the stand's gov_rental_cost for backward compatibility
+      await supabase.from('stands').update({
+        gov_rental_cost: parseFloat(rentForm.monthly_amount)
+      }).eq('id', id)
+
+      toast({ title: 'تم الحفظ', description: 'تم تحديث الإيجار الحكومي', variant: 'success' })
+      setChangeRentDialogOpen(false)
+      setRentForm({ monthly_amount: '', start_date: '' })
       fetchAll()
     } catch (e) { toast({ title: 'خطأ', description: e.message, variant: 'error' }) }
     setSaving(false)
@@ -442,7 +494,42 @@ export default function StandDetail() {
         </TabsContent>
 
         {/* Tab: Gov Permit */}
-        <TabsContent value="gov" className="mt-6">
+        <TabsContent value="gov" className="mt-6 space-y-4">
+          {/* Current Monthly Rent Card */}
+          <Card className="overflow-hidden border-primary/20">
+            <div className="h-px bg-gradient-to-r from-primary/40 via-primary/10 to-transparent" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex flex-reverse items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-primary" />
+                </div>
+                <CardTitle className="text-base">الإيجار الحكومي الشهري</CardTitle>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setChangeRentDialogOpen(true)} className="gap-2">
+                <Edit2 className="w-4 h-4" /> تغيير المبلغ
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-primary/5 rounded-xl px-4 py-3 border border-primary/20">
+                  <p className="text-xs text-muted-foreground mb-1">المبلغ الشهري الحالي</p>
+                  <p className="text-xl font-black text-primary">{formatCurrency(getCurrentMonthlyGovRent(govRentalHistory))}</p>
+                </div>
+                <div className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                  <p className="text-xs text-muted-foreground mb-1">التكلفة اليومية (تقريبياً)</p>
+                  <p className="text-lg font-bold text-foreground">{formatCurrency(getCurrentMonthlyGovRent(govRentalHistory) / 30)}</p>
+                </div>
+                <div className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
+                  <p className="text-xs text-muted-foreground mb-1">آخر تغيير</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {govRentalHistory.length > 0 ? formatDate(govRentalHistory[0].start_date) : '—'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* License Info Card */}
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -486,9 +573,52 @@ export default function StandDetail() {
                   ))}
                   <div className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
                     <p className="text-xs text-muted-foreground mb-1">الحالة</p>
-                    <p className="mt-0.5"><StatusBadge status={govStatus} /></p>
+                    <div className="mt-0.5"><StatusBadge status={govStatus} /></div>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Rent Change History */}
+          <Card className="overflow-hidden">
+            <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
+            <CardHeader className="pb-2">
+              <div className="flex flex-reverse items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
+                  <History className="w-4 h-4 text-info" />
+                </div>
+                <CardTitle className="text-base">سجل تغييرات الإيجار</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {govRentalHistory.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 font-medium">لا يوجد سجلات تغيير</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>من تاريخ</TableHead>
+                      <TableHead>إلى تاريخ</TableHead>
+                      <TableHead>المبلغ الشهري</TableHead>
+                      <TableHead>التكلفة اليومية</TableHead>
+                      <TableHead>ملاحظات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {govRentalHistory.map((entry, idx) => (
+                      <TableRow key={entry.id} className="hover:bg-muted/40 transition-colors">
+                        <TableCell className="text-sm">{formatDate(entry.start_date)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {entry.end_date ? formatDate(entry.end_date) : <span className="text-success font-medium">حالي</span>}
+                        </TableCell>
+                        <TableCell className="font-bold text-sm">{formatCurrency(entry.monthly_amount)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatCurrency(safeNum(entry.monthly_amount) / 30)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{entry.notes || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -816,6 +946,7 @@ export default function StandDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
 
       {/* Add Maintenance Dialog */}
       <Dialog open={maintDialogOpen} onOpenChange={setMaintDialogOpen}>
@@ -887,7 +1018,46 @@ export default function StandDetail() {
         confirmText="حذف"
         onConfirm={() => deleteMaint(deleteConfirm)}
       />
+
+      {/* Change Government Rent Dialog */}
+      <Dialog open={changeRentDialogOpen} onOpenChange={setChangeRentDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>تغيير الإيجار الحكومي الشهري</DialogTitle></DialogHeader>
+          <div className="p-6 space-y-4">
+            <div className="bg-info/5 border border-info/20 rounded-xl px-4 py-3 text-sm">
+              <p className="text-muted-foreground">
+                سيتم احتساب الإيجار الجديد من تاريخ البداية المحدد. الإيجار اليومي = المبلغ الشهري ÷ 30
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="المبلغ الشهري (جنيه)" required>
+                <Input
+                  type="number"
+                  value={rentForm.monthly_amount}
+                  onChange={e => setRentForm({...rentForm, monthly_amount: e.target.value})}
+                  placeholder="مثال: 3000"
+                />
+              </FormField>
+              <FormField label="تاريخ البداية" required>
+                <DateInput
+                  value={rentForm.start_date}
+                  onChange={e => setRentForm({...rentForm, start_date: e.target.value})}
+                />
+              </FormField>
+            </div>
+            {getCurrentMonthlyGovRent(govRentalHistory) > 0 && (
+              <div className="text-sm text-muted-foreground">
+                <p>المبلغ الحالي: <span className="font-bold text-foreground">{formatCurrency(getCurrentMonthlyGovRent(govRentalHistory))}</span>/شهر</p>
+                <p>التكلفة اليومية الحالية: <span className="font-bold text-foreground">{formatCurrency(getCurrentMonthlyGovRent(govRentalHistory) / 30)}</span></p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="justify-end">
+            <Button variant="outline" onClick={() => { setChangeRentDialogOpen(false); setRentForm({ monthly_amount: '', start_date: '' }) }}>إلغاء</Button>
+            <Button onClick={handleChangeRent} disabled={saving}>{saving ? 'جاري الحفظ...' : 'تغيير المبلغ'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-    </div>
-  )
+  );
 }

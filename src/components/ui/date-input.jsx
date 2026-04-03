@@ -1,4 +1,3 @@
-import { forwardRef } from 'react'
 import DatePickerModule from 'react-multi-date-picker'
 import gregorian_ar from 'react-date-object/locales/gregorian_ar'
 import { CalendarIcon } from 'lucide-react'
@@ -7,7 +6,7 @@ import { cn } from '@/lib/utils'
 const DatePicker = DatePickerModule.default ?? DatePickerModule
 const westernDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-const DateInput = forwardRef(({ className, value, onChange, disabled, readOnly, placeholder = 'اختر التاريخ', ...props }, ref) => {
+function DateInput({ className, value, onChange, disabled, readOnly, placeholder = 'اختر التاريخ', ...props }) {
   const emitChange = (dateObject) => {
     if (!onChange) return
 
@@ -31,14 +30,14 @@ const DateInput = forwardRef(({ className, value, onChange, disabled, readOnly, 
       readOnly={readOnly}
       arrow={false}
       shadow={false}
-      zIndex={80}
+      zIndex={9999}
       fixRelativePosition
       calendarPosition="bottom-right"
+      portal={document.body}
       containerClassName="app-date-picker-container"
       className="app-date-picker"
       render={(formattedValue, openCalendar) => (
         <button
-          ref={ref}
           type="button"
           dir="rtl"
           onClick={() => {
@@ -64,7 +63,6 @@ const DateInput = forwardRef(({ className, value, onChange, disabled, readOnly, 
       {...props}
     />
   )
-})
-DateInput.displayName = 'DateInput'
+}
 
 export { DateInput }

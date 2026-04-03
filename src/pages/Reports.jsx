@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, BarChart3, FileText, Wrench, TrendingUp } from 'lucide-react'
+import { Download, BarChart3, FileText, Wrench, TrendingUp, Building2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { exportExcelFile, formatDate, formatCurrency, safeNum, getLast6MonthsLabels, statusLabels, toLocalDateStr, computeContractStatus } from '@/lib/utils'
+import { exportExcelFile, formatDate, formatCurrency, safeNum, getLast6MonthsLabels, statusLabels, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
@@ -50,14 +50,20 @@ export default function Reports() {
   const [mntTo, setMntTo] = useState(defaultTo)
   const [mntData, setMntData] = useState(null)
 
+  // Government rent report
+  const [govFrom, setGovFrom] = useState(defaultFrom)
+  const [govTo, setGovTo] = useState(defaultTo)
+  const [govData, setGovData] = useState(null)
+
   useEffect(() => { fetchAll() }, [])
   useEffect(() => { fetchRevenue() }, [revFrom, revTo])
   useEffect(() => { fetchContracts() }, [ctFrom, ctTo])
   useEffect(() => { fetchMaintenance() }, [mntFrom, mntTo])
+  useEffect(() => { fetchGovernmentRent() }, [govFrom, govTo])
 
   async function fetchAll() {
     setLoading(true)
-    await Promise.all([fetchRevenue(), fetchContracts(), fetchMaintenance()])
+    await Promise.all([fetchRevenue(), fetchContracts(), fetchMaintenance(), fetchGovernmentRent()])
     setLoading(false)
   }
 
@@ -182,6 +188,61 @@ export default function Reports() {
     setMntData({ total, paid, unpaid: total - paid, byStand: Object.values(byStand), records: records || [] })
   }
 
+  async function fetchGovernmentRent() {
+    const { data: history } = await supabase
+      .from('gov_rental_history')
+      .select('*, stands(code, address)')
+      .order('start_date', { ascending: false })
+
+    const historyList = history || []
+    
+    // Calculate total for the selected period
+    const total = calculateGovRentForPeriod(historyList, govFrom, govTo)
+
+    // By stand
+    const byStand = {}
+    historyList.forEach(h => {
+      const code = h.stands?.code || 'غير محدد'
+      const addr = h.stands?.address || ''
+      if (!byStand[code]) {
+        byStand[code] = { code, address: addr, history: [], total: 0 }
+      }
+      byStand[code].history.push(h)
+    })
+
+    // Calculate per-stand totals for the period
+    Object.keys(byStand).forEach(code => {
+      byStand[code].total = calculateGovRentForPeriod(byStand[code].history, govFrom, govTo)
+    })
+
+    // Monthly breakdown
+    const monthMap = {}
+    historyList.forEach(h => {
+      const start = new Date(h.start_date)
+      const end = h.end_date ? new Date(h.end_date) : new Date(govTo)
+      const monthlyAmount = safeNum(h.monthly_amount)
+      const dailyAmount = monthlyAmount / 30
+
+      // Iterate through each day in the period and check if it overlaps with [govFrom, govTo]
+      const from = new Date(govFrom)
+      const to = new Date(govTo)
+      const overlapStart = from > start ? from : start
+      const overlapEnd = to < end ? to : end
+
+      if (overlapStart <= overlapEnd) {
+        let currentDate = new Date(overlapStart)
+        while (currentDate <= overlapEnd) {
+          const key = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+          monthMap[key] = (monthMap[key] || 0) + dailyAmount
+          currentDate.setDate(currentDate.getDate() + 1)
+        }
+      }
+    })
+    const chartData = Object.entries(monthMap).sort().map(([k, v]) => ({ name: k, total: Math.round(v) }))
+
+    setGovData({ total, byStand: Object.values(byStand), chartData, history: historyList })
+  }
+
   async function exportRevExcel() {
     const summary = [['إجمالي الإيرادات', revData.total], ['الفترة من', revFrom], ['إلى', revTo]]
     const byStandRows = revData.byStand.map(s => ({ 'كود اللوحة': s.code, 'العنوان': s.address, 'الإجمالي (جنيه)': s.total }))
@@ -271,6 +332,15 @@ export default function Reports() {
     ])
   }
 
+  async function exportGovRentExcel() {
+    const summary = [['إجمالي الإيجار الحكومي', govData.total], ['الفترة من', govFrom], ['إلى', govTo]]
+    const byStandRows = govData.byStand.map(s => ({ 'كود اللوحة': s.code, 'العنوان': s.address, 'الإجمالي (جنيه)': s.total }))
+    await exportExcelFile('تقرير_الإيجار_الحكومي.xlsx', [
+      { name: 'ملخص', type: 'aoa', rows: summary },
+      { name: 'تفاصيل اللوحات', rows: byStandRows },
+    ])
+  }
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload?.length) {
       return (
@@ -299,6 +369,9 @@ export default function Reports() {
           </TabsTrigger>
           <TabsTrigger value="maintenance" className="flex items-center gap-1.5">
             <Wrench className="w-4 h-4" /> الصيانة
+          </TabsTrigger>
+          <TabsTrigger value="govRent" className="flex items-center gap-1.5">
+            <Building2 className="w-4 h-4" /> الإيجار الحكومي
           </TabsTrigger>
         </TabsList>
 
@@ -496,6 +569,57 @@ export default function Reports() {
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Government Rent Report */}
+        <TabsContent value="govRent" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" /> تقرير الإيجار الحكومي
+              </CardTitle>
+              <div className="flex items-center gap-3 flex-wrap">
+                <DateRangeFilter from={govFrom} to={govTo} onFromChange={setGovFrom} onToChange={setGovTo} />
+                <Button size="sm" variant="outline" onClick={exportGovRentExcel}>
+                  <Download className="w-4 h-4" /> Excel
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <StatCard title="إجمالي الإيجار في الفترة" value={formatCurrency(govData?.total || 0)} icon={Building2} variant="warning" />
+                <StatCard title="عدد اللوحات" value={govData?.byStand?.length || 0} icon={Building2} variant="info" />
+                <StatCard title="متوسط الإيجار اليومي" value={formatCurrency((govData?.total || 0) / 30)} icon={Building2} variant="default" />
+              </div>
+
+              {govData?.chartData?.length > 0 && (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={govData.chartData} margin={{ top: 5, right: 5, left: 30, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="total" fill="hsl(var(--warning))" radius={[6,6,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>كود اللوحة</TableHead><TableHead>العنوان</TableHead><TableHead>الإجمالي في الفترة</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(govData?.byStand || []).sort((a,b) => b.total - a.total).map(s => (
+                    <TableRow key={s.code}>
+                      <TableCell className="font-semibold">{s.code}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{s.address?.slice(0,40)}</TableCell>
+                      <TableCell className="font-medium text-warning">{formatCurrency(s.total)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
