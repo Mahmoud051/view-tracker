@@ -21,7 +21,7 @@ function DialogOverlay({ className, ...props }) {
   )
 }
 
-function DialogContent({ className, children, title, ...props }) {
+function DialogContent({ className, children, title, description, ...props }) {
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -39,6 +39,7 @@ function DialogContent({ className, children, title, ...props }) {
         )}
         {...props}
       >
+        {title && <DialogHeader><DialogTitle>{title}</DialogTitle>{description && <DialogDescription>{description}</DialogDescription>}</DialogHeader>}
         {children}
       </DialogPrimitive.Content>
     </DialogPortal>
