@@ -18,8 +18,8 @@ const buildEmptyForm = () => ({
   gov_license_number: '', gov_rental_start: todayStr(), gov_rental_end: '', gov_rental_cost: '',
 })
 
-const MEASUREMENT_INPUT_PATTERN = /^\d*(\.\d?)?$/
-const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d)?$/
+const MEASUREMENT_INPUT_PATTERN = /^\d*\.?\d{0,2}$/
+const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d{1,2})?$/
 
 export default function Stands() {
   const [stands, setStands] = useState([])
@@ -75,8 +75,8 @@ export default function Stands() {
     const errs = {}
     if (!form.code.trim()) errs.code = 'كود اللوحة مطلوب'
     if (!form.address.trim()) errs.address = 'العنوان مطلوب'
-    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.width).trim())) errs.width = 'أدخل رقمًا صحيحًا أو منزلة عشرية واحدة فقط مثل 1 أو 1.1'
-    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.height).trim())) errs.height = 'أدخل رقمًا صحيحًا أو منزلة عشرية واحدة فقط مثل 2 أو 2.5'
+    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.width).trim())) errs.width = 'أدخل رقمًا صحيحًا أو منزلتين عشريتين كحد أقصى مثل 1 أو 1.1 أو 1.23'
+    if (!MEASUREMENT_VALUE_PATTERN.test(String(form.height).trim())) errs.height = 'أدخل رقمًا صحيحًا أو منزلتين عشريتين كحد أقصى مثل 2 أو 2.5 أو 2.75'
     setFormErrors(errs)
     return Object.keys(errs).length === 0
   }

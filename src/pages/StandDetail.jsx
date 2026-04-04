@@ -21,8 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { subMonths } from 'date-fns'
 
-const MEASUREMENT_INPUT_PATTERN = /^\d*(\.\d?)?$/
-const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d)?$/
+const MEASUREMENT_INPUT_PATTERN = /^\d*\.?\d{0,2}$/
+const MEASUREMENT_VALUE_PATTERN = /^\d+(\.\d{1,2})?$/
 
 export default function StandDetail() {
   const { id } = useParams()
@@ -147,7 +147,7 @@ export default function StandDetail() {
 
   async function saveInfo() {
     if (!MEASUREMENT_VALUE_PATTERN.test(String(infoForm.width).trim()) || !MEASUREMENT_VALUE_PATTERN.test(String(infoForm.height).trim())) {
-      toast({ title: 'خطأ', description: 'الطول والعرض يجب أن يكونا أرقامًا صحيحة أو بمنزلة عشرية واحدة فقط مثل 1 أو 1.1', variant: 'error' })
+      toast({ title: 'خطأ', description: 'الطول والعرض يجب أن يكونا أرقامًا صحيحة أو بمنزلتين عشريتين كحد أقصى مثل 1 أو 1.1 أو 1.23', variant: 'error' })
       return
     }
     setSaving(true)
@@ -1021,7 +1021,7 @@ export default function StandDetail() {
 
       {/* Change Government Rent Dialog */}
       <Dialog open={changeRentDialogOpen} onOpenChange={setChangeRentDialogOpen}>
-        <DialogContent className="max-w-xl" description="سيتم احتساب الإيجار الجديد من تاريخ البداية المحدد">
+        <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>تغيير الإيجار الحكومي الشهري</DialogTitle></DialogHeader>
           <div className="p-6 space-y-4">
             <div className="bg-info/5 border border-info/20 rounded-xl px-4 py-3 text-sm">

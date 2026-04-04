@@ -189,9 +189,10 @@ input[type=number] {
 
 .app-date-picker {
   position: relative;
-  z-index: 70;
+  z-index: auto;
 }
 
+/* Main calendar wrapper */
 .app-date-picker .rmdp-wrapper {
   border: 1px solid hsl(220 27% 20%);
   background: hsl(220 33% 11%);
@@ -199,8 +200,12 @@ input[type=number] {
   border-radius: 1rem;
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
   padding: 0.5rem;
+  pointer-events: auto !important;
+  z-index: 9999 !important;
+  cursor: default;
 }
 
+/* All calendar elements should be interactive */
 .app-date-picker .rmdp-calendar,
 .app-date-picker .rmdp-top-class,
 .app-date-picker .rmdp-day-picker,
@@ -209,16 +214,22 @@ input[type=number] {
 .app-date-picker .rmdp-year-picker {
   background: hsl(220 33% 11%);
   color: hsl(213 31% 91%);
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 .app-date-picker .rmdp-header-values {
   color: hsl(213 31% 91%);
   font-weight: 700;
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 .app-date-picker .rmdp-arrow-container {
   border-radius: 0.75rem;
   color: hsl(213 31% 91%);
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 .app-date-picker .rmdp-arrow-container:hover {
@@ -227,19 +238,29 @@ input[type=number] {
 
 .app-date-picker .rmdp-arrow {
   border-color: hsl(213 31% 91%);
+  pointer-events: none;
 }
 
 .app-date-picker .rmdp-day,
 .app-date-picker .rmdp-week-day {
   color: hsl(213 31% 91%);
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 .app-date-picker .rmdp-week-day {
   color: hsl(215 16% 57%);
+  pointer-events: none !important;
+  cursor: default !important;
 }
 
 .app-date-picker .rmdp-day span {
   border-radius: 0.75rem;
+  pointer-events: auto !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .app-date-picker .rmdp-day.rmdp-today span {
@@ -261,5 +282,54 @@ input[type=number] {
 .app-date-picker .rmdp-day.rmdp-disabled {
   color: hsl(215 16% 57%);
   opacity: 0.45;
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* Ensure hidden days are not clickable */
+.app-date-picker .rmdp-day.rmdp-day-hidden {
+  pointer-events: none !important;
+  cursor: default !important;
+  opacity: 0;
+}
+
+/* Ensure the calendar container doesn't block clicks */
+.app-date-picker .rmdp {
+  pointer-events: auto !important;
+}
+
+/* Global calendar popup should always be on top and clickable */
+.rmdp-wrapper {
+  pointer-events: auto !important;
+  z-index: 99999 !important;
+  position: absolute !important;
+}
+
+.rmdp-day {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.rmdp-day span {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.rmdp-arrow-container {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.rmdp-header-values {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }
 

@@ -1,5 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
+import { forwardRef } from 'react'
 import { cn } from '@/lib/utils'
 
 const Dialog = DialogPrimitive.Root
@@ -7,9 +8,10 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogPortal = DialogPrimitive.Portal
 const DialogClose = DialogPrimitive.Close
 
-function DialogOverlay({ className, ...props }) {
+const DialogOverlay = forwardRef(({ className, ...props }, ref) => {
   return (
     <DialogPrimitive.Overlay
+      ref={ref}
       className={cn(
         'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -19,13 +21,15 @@ function DialogOverlay({ className, ...props }) {
       {...props}
     />
   )
-}
+})
+DialogOverlay.displayName = 'DialogOverlay'
 
-function DialogContent({ className, children, title, description, ...props }) {
+const DialogContent = forwardRef(({ className, children, ...props }, ref) => {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={ref}
         dir="rtl"
         className={cn(
           'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
@@ -39,35 +43,40 @@ function DialogContent({ className, children, title, description, ...props }) {
         )}
         {...props}
       >
-        {title && <DialogHeader><DialogTitle>{title}</DialogTitle>{description && <DialogDescription>{description}</DialogDescription>}</DialogHeader>}
         {children}
       </DialogPrimitive.Content>
     </DialogPortal>
   )
-}
+})
+DialogContent.displayName = 'DialogContent'
 
-function DialogHeader({ className, ...props }) {
+const DialogHeader = forwardRef(({ className, ...props }, ref) => {
   return (
     <div
+      ref={ref}
       className={cn('flex items-center justify-between gap-3 p-6 pb-4 border-b border-border', className)}
       {...props}
     />
   )
-}
+})
+DialogHeader.displayName = 'DialogHeader'
 
-function DialogFooter({ className, ...props }) {
+const DialogFooter = forwardRef(({ className, ...props }, ref) => {
   return (
     <div
+      ref={ref}
       className={cn('flex items-center justify-end gap-3 p-6 pt-4 border-t border-border', className)}
       {...props}
     />
   )
-}
+})
+DialogFooter.displayName = 'DialogFooter'
 
-function DialogTitle({ className, ...props }) {
+const DialogTitle = forwardRef(({ className, ...props }, ref) => {
   return (
     <div className="flex items-center gap-3 flex-1">
       <DialogPrimitive.Title
+        ref={ref}
         className={cn('text-lg font-bold text-foreground', className)}
         {...props}
       />
@@ -77,16 +86,19 @@ function DialogTitle({ className, ...props }) {
       </DialogPrimitive.Close>
     </div>
   )
-}
+})
+DialogTitle.displayName = 'DialogTitle'
 
-function DialogDescription({ className, ...props }) {
+const DialogDescription = forwardRef(({ className, ...props }, ref) => {
   return (
     <DialogPrimitive.Description
+      ref={ref}
       className={cn('text-sm text-muted-foreground', className)}
       {...props}
     />
   )
-}
+})
+DialogDescription.displayName = 'DialogDescription'
 
 export {
   Dialog,

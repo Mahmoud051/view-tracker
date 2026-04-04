@@ -30,18 +30,23 @@ function DateInput({ className, value, onChange, disabled, readOnly, placeholder
       readOnly={readOnly}
       arrow={false}
       shadow={false}
-      zIndex={9999}
+      zIndex={99999}
       fixRelativePosition
       calendarPosition="bottom-right"
-      portal={document.body}
+      portal
+      portalTarget={typeof document !== 'undefined' ? document.body : null}
       containerClassName="app-date-picker-container"
       className="app-date-picker"
       render={(formattedValue, openCalendar) => (
         <button
           type="button"
           dir="rtl"
-          onClick={() => {
-            if (!disabled && !readOnly) openCalendar()
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (!disabled && !readOnly) {
+              openCalendar()
+            }
           }}
           disabled={disabled}
           aria-label={placeholder}
