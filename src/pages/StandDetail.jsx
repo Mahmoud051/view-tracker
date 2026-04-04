@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import {
    Edit2, Save, X, Plus, Trash2, Building2, MapPin,
   Ruler, Clock, FileText, DollarSign, Wrench, PlayCircle,
-  ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight
+  ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight, Maximize2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr, getCurrentMonthlyGovRent } from '@/lib/utils'
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/index'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/index'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/index'
 import { LoadingScreen, StatusBadge, FormField, ConfirmDialog, StatCard } from '@/components/ui/shared'
@@ -47,6 +48,7 @@ export default function StandDetail() {
   const [editingMaintForm, setEditingMaintForm] = useState({ date: '', description: '', cost: '', technician_name: '', is_paid: false })
   const [changeRentDialogOpen, setChangeRentDialogOpen] = useState(false)
   const [rentForm, setRentForm] = useState({ monthly_amount: '', start_date: '' })
+  const [imageModalOpen, setImageModalOpen] = useState(false)
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -332,10 +334,14 @@ export default function StandDetail() {
       <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm">
         {stand.photo_url ? (
           <div
-            className="h-44 sm:h-52 bg-cover bg-center relative"
+            className="h-44 sm:h-52 bg-cover bg-center relative cursor-pointer group"
             style={{ backgroundImage: `url(${stand.photo_url})` }}
+            onClick={() => setImageModalOpen(true)}
           >
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20" />
+            <div className="absolute top-3 end-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg p-2">
+              <Maximize2 className="w-5 h-5 text-white" />
+            </div>
           </div>
         ) : (
           <div className="h-28 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-b border-border/60" />
@@ -442,10 +448,16 @@ export default function StandDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               {stand.photo_url && !editingInfo && (
-                <div className="relative rounded-xl overflow-hidden border border-border group">
+                <div 
+                  className="relative rounded-xl overflow-hidden border border-border group cursor-pointer"
+                  onClick={() => setImageModalOpen(true)}
+                >
                   <img src={stand.photo_url} alt={stand.code} className="w-full h-56 object-cover" />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2">
+                      <Maximize2 className="w-5 h-5 text-white" />
+                      <span className="text-white text-sm font-medium">عرض الصورة</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1056,6 +1068,37 @@ export default function StandDetail() {
             <Button variant="outline" onClick={() => { setChangeRentDialogOpen(false); setRentForm({ monthly_amount: '', start_date: '' }) }}>إلغاء</Button>
             <Button onClick={handleChangeRent} disabled={saving}>{saving ? 'جاري الحفظ...' : 'تغيير المبلغ'}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Modal */}
+      <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
+        <DialogContent className="max-w-5xl w-[95vw] p-0 overflow-hidden">
+          <DialogPrimitive.Title className="sr-only">صورة اللوحة - {stand.code}</DialogPrimitive.Title>
+          <div className="relative bg-gradient-to-b from-card to-card/95 border-b border-border px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">صورة اللوحة</h2>
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                {stand.address}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setImageModalOpen(false)}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="relative bg-black/5">
+            <img 
+              src={stand.photo_url} 
+              alt={stand.code} 
+              className="w-full h-auto max-h-[80vh] object-contain" 
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

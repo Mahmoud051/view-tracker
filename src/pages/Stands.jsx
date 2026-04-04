@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, MapPin, Calendar, User, Ruler, Wallet } from 'lucide-react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Plus, Search, Building2, MapPin, Calendar, User, Ruler, Wallet, Maximize2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cn, formatDate, formatCurrency, computeGovStatus, computeContractStatus, todayStr, safeNum, paymentIntervalMonths } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -34,6 +35,7 @@ export default function Stands() {
   const [saving, setSaving] = useState(false)
   const [photoFile, setPhotoFile] = useState(null)
   const [paymentsMap, setPaymentsMap] = useState({})
+  const [selectedImage, setSelectedImage] = useState(null)
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -188,7 +190,15 @@ export default function Stands() {
                 {/* Photo */}
                 <div className="h-36 bg-muted relative overflow-hidden">
                   {stand.photo_url ? (
-                    <img src={stand.photo_url} alt={stand.code} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <img 
+                      src={stand.photo_url} 
+                      alt={stand.code} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedImage({ url: stand.photo_url, code: stand.code })
+                      }} 
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Building2 className="w-10 h-10 text-muted-foreground/40" />
@@ -200,6 +210,13 @@ export default function Stands() {
                   {govSt !== 'active' && (
                     <div className="absolute top-2 end-2">
                       <StatusBadge status={govSt} className="text-xs" />
+                    </div>
+                  )}
+                  {stand.photo_url && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg p-2 pointer-events-auto">
+                        <Maximize2 className="w-5 h-5 text-white" />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -364,6 +381,36 @@ export default function Stands() {
               {saving ? 'جاري الحفظ...' : 'حفظ اللوحة'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-5xl w-[95vw] p-0 overflow-hidden">
+          <DialogPrimitive.Title className="sr-only">صورة اللوحة - {selectedImage?.code}</DialogPrimitive.Title>
+          <div className="relative bg-gradient-to-b from-card to-card/95 border-b border-border px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">صورة اللوحة</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {selectedImage?.code}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedImage(null)}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="relative bg-black/5">
+            <img 
+              src={selectedImage?.url} 
+              alt={selectedImage?.code} 
+              className="w-full h-auto max-h-[80vh] object-contain" 
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

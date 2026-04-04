@@ -18,7 +18,7 @@ const navItems = [
   { to: '/reports', icon: BarChart3, label: 'التقارير' },
 ]
 
-function SidebarContent({ onClose, className }) {
+function SidebarContent({ onClose, className, showCloseButton = true }) {
   const { signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
@@ -42,12 +42,14 @@ function SidebarContent({ onClose, className }) {
           </div>
           <span className="text-xl font-black text-foreground tracking-tight">ڤيو</span>
         </div>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors lg:hidden"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {showCloseButton && (
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors lg:hidden"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
@@ -104,7 +106,7 @@ export function Sidebar({ open, onClose, className }) {
 
       <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
         <SheetContent side="right" className="w-[var(--sidebar-width)] border-s border-border p-0 sm:max-w-[var(--sidebar-width)]">
-          <SidebarContent onClose={onClose} />
+          <SidebarContent onClose={onClose} showCloseButton={false} />
         </SheetContent>
       </Sheet>
     </>
