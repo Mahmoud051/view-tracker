@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, Users, CheckCircle, AlertCircle, TrendingUp, Bell, FileText, PieChart as PieChartIcon, Wrench, CreditCard } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, daysRemaining, getLast6MonthsLabels, safeNum, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod, getCurrentMonthlyGovRent } from '@/lib/utils'
+import { formatDate, formatCurrency, daysRemaining, getLast12MonthsLabels, safeNum, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod, getCurrentMonthlyGovRent } from '@/lib/utils'
 import { StatCard, LoadingScreen, PageHeader } from '@/components/ui/shared'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -209,8 +209,8 @@ export default function Dashboard() {
         }))
       )
 
-      // Revenue chart last 6 months
-      const months = getLast6MonthsLabels()
+      // Revenue chart last 12 months
+      const months = getLast12MonthsLabels()
       const firstMonth = `${months[0].year}-${String(months[0].month).padStart(2, '0')}-01`
       const recentPayments = (allPayments || []).filter(p => p.payment_date >= firstMonth)
       const monthlyTotals = {}
@@ -358,7 +358,7 @@ export default function Dashboard() {
         <CardHeader>
           <CardTitle className="flex flex-reverse items-center gap-2 text-base">
             <TrendingUp className="w-5 h-5 text-primary" />
-            الإيرادات — آخر 6 أشهر
+            الإيرادات — آخر 12 شهر
           </CardTitle>
         </CardHeader>
         <CardContent>

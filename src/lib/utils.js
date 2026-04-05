@@ -151,10 +151,10 @@ export function calculateEndDate(startDate, rentalType) {
 }
 
 // Get last 6 months labels in Arabic
-export function getLast6MonthsLabels() {
+export function getLast12MonthsLabels() {
   const months = []
   const today = new Date()
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
     months.push({
       label: format(d, 'MMM yyyy', { locale: arEG }),
