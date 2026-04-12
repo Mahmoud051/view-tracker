@@ -81,7 +81,29 @@ export default function ContractDetail() {
   }
 
   const totalPaid = payments.reduce((a, p) => a + safeNum(p.amount), 0)
-  
+
+  // Calculate elapsed time since contract start
+  let elapsedMonths = 0
+  let extraDays = 0
+  if (contract && contract.start_date) {
+    const now = new Date()
+    const start = new Date(contract.start_date)
+    const totalMonthsDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+    // Calculate extra days without rounding
+    const tempDate = new Date(start)
+    tempDate.setMonth(tempDate.getMonth() + totalMonthsDiff)
+    const diffDays = Math.floor((now - tempDate) / 86400000)
+    if (diffDays < 0) {
+      elapsedMonths = Math.max(0, totalMonthsDiff - 1)
+      const adjustedDate = new Date(start)
+      adjustedDate.setMonth(adjustedDate.getMonth() + elapsedMonths)
+      extraDays = Math.floor((now - adjustedDate) / 86400000)
+    } else {
+      elapsedMonths = totalMonthsDiff
+      extraDays = diffDays
+    }
+  }
+
   // Calculate cost for past months (elapsed cost)
   let elapsedCost = 0
   if (contract && contract.start_date) {
@@ -459,21 +481,32 @@ export default function ContractDetail() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <StatCard title="قيمة العقد" value={contract.is_open ? '—' : formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
-        <StatCard title="تكلفة الفترة الحالية" value={formatCurrency(elapsedCost)} icon={CreditCard} variant="info" />
+        <StatCard 
+          title="مدة العقد" 
+          value={contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`} 
+          icon={CreditCard} 
+          variant="info" 
+        />
+        <StatCard 
+          title="الفترة المنقضية" 
+          value={
+            <span>
+              {elapsedMonths} شهر
+              {extraDays > 0 && <span className="text-xs text-muted-foreground ms-1">و{extraDays} يوم</span>}
+            </span>
+          } 
+          icon={CreditCard} 
+          variant="info" 
+        />
+        <StatCard title="تكلفة الفترة" value={formatCurrency(elapsedCost)} icon={CreditCard} variant="info" />
         <StatCard title="المدفوع" value={formatCurrency(totalPaid)} icon={CheckCircle} variant="success" />
         <StatCard
           title={owed > 0 ? "عليه" : "له"}
           value={formatCurrency(owed > 0 ? owed : prepaid)}
           icon={CreditCard}
           variant={owed > 0 ? 'danger' : 'success'}
-        />
-        <StatCard
-          title={contract.is_open ? "نوع العقد" : "مدة العقد"}
-          value={contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`}
-          icon={CreditCard}
-          variant="info"
         />
       </div>
 
