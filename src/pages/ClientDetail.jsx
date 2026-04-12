@@ -84,12 +84,43 @@ export default function ClientDetail() {
   }, 0)
 
   const totalPaid = contracts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
-  const owed = Math.max(0, totalValue - totalPaid)
-  const credit = Math.max(0, totalPaid - totalValue)
-
-  // Period-based amount due across all contracts (including terminated)
+  
+  // Calculate total elapsed cost across all contracts
   const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
   const now = new Date()
+  let totalElapsedCost = 0
+  
+  contracts.forEach(c => {
+    if (!c.start_date) return
+    const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+    if (realStatus === 'upcoming') return
+    
+    const paymentFreq = c.payment_frequency || 'monthly'
+    const start = new Date(c.start_date)
+    const end = c.end_date ? new Date(c.end_date) : null
+    const nowCapped = end && now > end ? end : now
+    const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+    const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
+    const periodRate = monthlyRate * intervalMonths
+    
+    let periodsDue
+    if (c.is_open) {
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.ceil(completeMonths / intervalMonths)
+    } else {
+      const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    }
+    totalElapsedCost += periodsDue * periodRate
+  })
+  
+  const totalOwed = Math.max(0, totalElapsedCost - totalPaid)
+  const totalPrepaid = Math.max(0, totalPaid - totalElapsedCost)
+
+  // Period-based amount due across all contracts (including terminated)
   const periodDue = contracts.reduce((acc, c) => {
     if (!c.start_date) return acc
     const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
@@ -167,9 +198,9 @@ export default function ClientDetail() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard title="عقود نشطة" value={active.length} icon={FileText} variant="success" />
         <StatCard title="عقود منتهية" value={expired.length} icon={FileText} variant="default" />
-        <StatCard title="إجمالي المدفوع" value={formatCurrency(totalPaid)} icon={FileText} variant="info" />
-        <StatCard title="مستحق الآن" value={formatCurrency(periodDue)} icon={FileText} variant={periodDue > 0 ? 'danger' : 'success'} />
-        <StatCard title="عليه / مستحق" value={formatCurrency(owed)} icon={FileText} variant={owed > 0 ? 'warning' : 'success'} />
+        <StatCard title="تكلفة الفترة الحالية" value={formatCurrency(totalElapsedCost)} icon={FileText} variant="info" />
+        <StatCard title="إجمالي المدفوع" value={formatCurrency(totalPaid)} icon={FileText} variant="success" />
+        <StatCard title={totalOwed > 0 ? "عليه" : "له"} value={formatCurrency(totalOwed > 0 ? totalOwed : totalPrepaid)} icon={FileText} variant={totalOwed > 0 ? 'danger' : 'success'} />
       </div>
 
       {/* Contracts table */}
@@ -189,27 +220,24 @@ export default function ClientDetail() {
                     <TableHead>نوع الإيجار</TableHead>
                     <TableHead>البداية</TableHead>
                     <TableHead>النهاية</TableHead>
-                    <TableHead>القيمة</TableHead>
+                    <TableHead>تكلفة الفترة</TableHead>
                     <TableHead>المدفوع</TableHead>
-                    <TableHead>مستحق الآن</TableHead>
-                    <TableHead>الباقي</TableHead>
+                    <TableHead>عليه / له</TableHead>
                     <TableHead>الحالة</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contracts.map(c => {
                     const paid = paymentsMap[c.id] || 0
-                    const contractOwed = Math.max(0, safeNum(c.total_value) - paid)
                     const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
 
-                    // Period-based amount due for this contract
-                    let periodDue = 0
+                    // Calculate elapsed cost for this contract
+                    let elapsedCost = 0
                     if (c.start_date && realStatus !== 'upcoming') {
                       const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
                       const now = new Date()
                       const start = new Date(c.start_date)
                       const paymentFreq = c.payment_frequency || 'monthly'
-                      // Cap at end_date for terminated/expired/open contracts
                       const end = c.end_date ? new Date(c.end_date) : null
                       const nowCapped = end && now > end ? end : now
                       const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
@@ -227,8 +255,11 @@ export default function ClientDetail() {
                         const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
                         periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
                       }
-                      periodDue = Math.max(0, periodsDue * periodRate - paid)
+                      elapsedCost = periodsDue * periodRate
                     }
+
+                    const contractOwed = Math.max(0, elapsedCost - paid)
+                    const contractPrepaid = Math.max(0, paid - elapsedCost)
 
                     // Days left for end date display
                     const daysLeft = c.end_date ? Math.ceil((new Date(c.end_date) - new Date()) / 86400000) : null
@@ -258,8 +289,8 @@ export default function ClientDetail() {
                               <p>{formatDate(c.end_date)}</p>
                               {daysLeft !== null && realStatus !== 'expired' && realStatus !== 'terminated' && (
                                 <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full mt-0.5 inline-block ${
-                                  daysLeft <= 30 ? 'bg-destructive/15 text-destructive' : 
-                                  daysLeft <= 90 ? 'bg-warning/15 text-warning' : 
+                                  daysLeft <= 30 ? 'bg-destructive/15 text-destructive' :
+                                  daysLeft <= 90 ? 'bg-warning/15 text-warning' :
                                   'bg-success/15 text-success'
                                 }`}>
                                   {daysLeft} يوم
@@ -268,13 +299,10 @@ export default function ClientDetail() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell>{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>
-                        <TableCell className={paid >= safeNum(c.total_value || 0) || (c.is_open && paid > 0) ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
-                        <TableCell className={`text-sm font-medium ${periodDue > 0 ? 'text-destructive' : 'text-success'}`}>
-                          {formatCurrency(periodDue)}
-                        </TableCell>
-                        <TableCell className={contractOwed > 0 ? 'text-destructive font-medium' : 'text-success font-medium'}>
-                          {formatCurrency(contractOwed)}
+                        <TableCell className="text-sm font-medium">{formatCurrency(elapsedCost)}</TableCell>
+                        <TableCell className={paid > 0 ? 'text-success font-medium' : 'text-muted-foreground'}>{formatCurrency(paid)}</TableCell>
+                        <TableCell className={`text-sm font-medium ${contractOwed > 0 ? 'text-destructive' : contractPrepaid > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                          {contractOwed > 0 ? formatCurrency(contractOwed) : contractPrepaid > 0 ? formatCurrency(contractPrepaid) : '—'}
                         </TableCell>
                         <TableCell><StatusBadge status={realStatus} /></TableCell>
                       </TableRow>

@@ -427,8 +427,8 @@ export default function Contracts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>اللوحة</TableHead><TableHead>العميل</TableHead><TableHead>المدة</TableHead>
-                  <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>القيمة الإجمالية</TableHead>
-                  <TableHead>المدفوع</TableHead><TableHead>مستحق الآن</TableHead><TableHead>الحالة</TableHead>
+                  <TableHead>البداية</TableHead><TableHead>النهاية</TableHead><TableHead>تكلفة الفترة</TableHead>
+                  <TableHead>المدفوع</TableHead><TableHead>عليه / له</TableHead><TableHead>الحالة</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,41 +436,20 @@ export default function Contracts() {
                   const paid = paymentsMap[c.id] || 0
                   const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
 
-                  // Calculate totalValue for open contracts using elapsed periods
-                  let contractTotalValue
-                  if (c.is_open) {
-                    if (!c.start_date || !c.monthly_rate) {
-                      contractTotalValue = paid
-                    } else {
-                      const start = new Date(c.start_date)
-                      const end = c.end_date ? new Date(c.end_date) : null
-                      const nowCapped = end && new Date() > end ? end : new Date()
-                      const intervalMonths = INTERVAL_MONTHS[c.payment_frequency || 'monthly'] || 1
-                      const periodRate = safeNum(c.monthly_rate) * intervalMonths
-                      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
-                      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-                      const periodsDue = Math.ceil(completeMonths / intervalMonths)
-                      contractTotalValue = periodsDue * periodRate
-                    }
-                  } else {
-                    contractTotalValue = safeNum(c.total_value)
-                  }
-                  const owed = Math.max(0, contractTotalValue - paid)
-
-                  // Period-based amount due (for all non-upcoming contracts)
-                  let periodDue = 0
+                  // Calculate elapsed cost (what was actually needed for past months)
+                  let elapsedCost = 0
+                  let prepaid = 0
+                  let owed = 0
+                  
                   if (c.start_date && realStatus !== 'upcoming') {
-                    const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+                    const INTERVAL_MONTHS_CALC = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
                     const now = new Date()
                     const start = new Date(c.start_date)
-                    // Default to monthly if payment_frequency is not set
-                    const paymentFreq = c.payment_frequency || 'monthly'
-                    // Cap at end_date for terminated/expired/open contracts
                     const end = c.end_date ? new Date(c.end_date) : null
                     const nowCapped = end && now > end ? end : now
-                    // For open contracts, prefer monthly_rate; otherwise calculate from total_value
+                    const paymentFreq = c.payment_frequency || 'monthly'
                     const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
-                    const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
+                    const intervalMonths = INTERVAL_MONTHS_CALC[paymentFreq] || 1
                     const periodRate = monthlyRate * intervalMonths
 
                     let periodsDue
@@ -484,7 +463,9 @@ export default function Contracts() {
                       const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
                       periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
                     }
-                    periodDue = Math.max(0, periodsDue * periodRate - paid)
+                    elapsedCost = periodsDue * periodRate
+                    prepaid = Math.max(0, paid - elapsedCost)
+                    owed = Math.max(0, elapsedCost - paid)
                   }
                   return (
                     <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
@@ -518,12 +499,12 @@ export default function Contracts() {
                           )
                         })()}
                       </TableCell>
-                      <TableCell className="text-sm font-medium">{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>
-                      <TableCell className={`text-sm font-medium ${paid >= contractTotalValue ? 'text-success' : 'text-muted-foreground'}`}>
+                      <TableCell className="text-sm font-medium">{formatCurrency(elapsedCost)}</TableCell>
+                      <TableCell className={`text-sm font-medium ${paid > 0 ? 'text-success' : 'text-muted-foreground'}`}>
                         {formatCurrency(paid)}
                       </TableCell>
-                      <TableCell className={`text-sm font-medium ${periodDue > 0 ? 'text-destructive' : 'text-success'}`}>
-                        {formatCurrency(periodDue)}
+                      <TableCell className={`text-sm font-medium ${owed > 0 ? 'text-destructive' : prepaid > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                        {owed > 0 ? formatCurrency(owed) : prepaid > 0 ? formatCurrency(prepaid) : '—'}
                       </TableCell>
                       <TableCell><StatusBadge status={realStatus} /></TableCell>
                     </TableRow>

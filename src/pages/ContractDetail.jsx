@@ -81,6 +81,37 @@ export default function ContractDetail() {
   }
 
   const totalPaid = payments.reduce((a, p) => a + safeNum(p.amount), 0)
+  
+  // Calculate cost for past months (elapsed cost)
+  let elapsedCost = 0
+  if (contract && contract.start_date) {
+    const INTERVAL_MONTHS_CALC = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+    const now = new Date()
+    const start = new Date(contract.start_date)
+    const end = contract.end_date ? new Date(contract.end_date) : null
+    const nowCapped = end && now > end ? end : now
+    const paymentFreq = contract.payment_frequency || 'monthly'
+    const monthlyRate = (contract.is_open && contract.monthly_rate) ? safeNum(contract.monthly_rate) : (safeNum(contract.total_value) / (parseInt(contract.duration_months) || 1))
+    const intervalMonths = INTERVAL_MONTHS_CALC[paymentFreq] || 1
+    const periodRate = monthlyRate * intervalMonths
+
+    let periodsDue
+    if (contract.is_open) {
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.ceil(completeMonths / intervalMonths)
+    } else {
+      const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
+      const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+      const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+      periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+    }
+    elapsedCost = periodsDue * periodRate
+  }
+
+  const prepaid = Math.max(0, totalPaid - elapsedCost)
+  const owed = Math.max(0, elapsedCost - totalPaid)
+  
   const balance = totalPaid - safeNum(contract?.total_value)
   const displayStatus = contract ? computeContractStatus(contract.start_date, contract.end_date, contract.status) : null
 
@@ -428,14 +459,15 @@ export default function ContractDetail() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard title="قيمة العقد" value={contract.is_open ? '—' : formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
+        <StatCard title="تكلفة الفترة الحالية" value={formatCurrency(elapsedCost)} icon={CreditCard} variant="info" />
         <StatCard title="المدفوع" value={formatCurrency(totalPaid)} icon={CheckCircle} variant="success" />
         <StatCard
-          title="مستحق الآن"
-          value={formatCurrency(periodDue)}
+          title={owed > 0 ? "عليه" : "له"}
+          value={formatCurrency(owed > 0 ? owed : prepaid)}
           icon={CreditCard}
-          variant={periodDue > 0 ? 'danger' : 'success'}
+          variant={owed > 0 ? 'danger' : 'success'}
         />
         <StatCard
           title={contract.is_open ? "نوع العقد" : "مدة العقد"}
@@ -534,13 +566,27 @@ export default function ContractDetail() {
                 </TableBody>
               </Table>
               <Separator className="my-4" />
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">إجمالي المدفوع:</span>
-                <span className="font-bold text-success text-base">{formatCurrency(totalPaid)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm mt-2">
-                <span className="text-muted-foreground">{balance >= 0 ? 'له / رصيد مدفوع:' : 'عليه / مستحق:'}</span>
-                <span className={`font-bold text-base ${balance >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(Math.abs(balance))}</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">تكلفة الأشهر المنقضية:</span>
+                  <span className="font-bold text-info text-base">{formatCurrency(elapsedCost)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">إجمالي المدفوع:</span>
+                  <span className="font-bold text-success text-base">{formatCurrency(totalPaid)}</span>
+                </div>
+                {owed > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">عليه:</span>
+                    <span className="font-bold text-destructive text-base">{formatCurrency(owed)}</span>
+                  </div>
+                )}
+                {prepaid > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">له (رصيد):</span>
+                    <span className="font-bold text-success text-base">{formatCurrency(prepaid)}</span>
+                  </div>
+                )}
               </div>
             </>          )}
         </CardContent>

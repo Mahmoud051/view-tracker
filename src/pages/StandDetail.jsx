@@ -102,8 +102,8 @@ export default function StandDetail() {
   }
 
   // periodDue for active contract
-  const periodDue = (() => {
-    if (!activeContract || !activeContract.start_date) return 0
+  const { elapsedCost, owed, prepaid, periodDue } = (() => {
+    if (!activeContract || !activeContract.start_date) return { elapsedCost: 0, owed: 0, prepaid: 0, periodDue: 0 }
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
     const start = new Date(activeContract.start_date)
@@ -127,7 +127,11 @@ export default function StandDetail() {
       const totalPeriods = Math.ceil((parseInt(activeContract.duration_months) || 1) / intervalMonths)
       periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
     }
-    return Math.max(0, periodsDue * periodRate - paid)
+    const elapsedCost = periodsDue * periodRate
+    const owed = Math.max(0, elapsedCost - paid)
+    const prepaid = Math.max(0, paid - elapsedCost)
+    const periodDue = Math.max(0, elapsedCost - paid)
+    return { elapsedCost, owed, prepaid, periodDue }
   })()
 
   // Last 6 months maintenance cost
@@ -388,7 +392,7 @@ export default function StandDetail() {
             { label: 'الأبعاد', value: `${safeNum(stand.width)} × ${safeNum(stand.height)} م`, icon: Ruler, color: 'text-primary' },
             { label: 'المساحة', value: `${safeNum(stand.width) * safeNum(stand.height)} م²`, icon: Building2, color: 'text-info' },
             { label: 'الأوجه', value: stand.sides == 2 ? 'وجهين' : 'وجه واحد', icon: FileText, color: 'text-warning' },
-            { label: 'مستحق الآن', value: formatCurrency(periodDue), icon: DollarSign, color: periodDue > 0 ? 'text-destructive' : 'text-success' },
+            { label: owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', value: formatCurrency(owed > 0 ? owed : prepaid), icon: DollarSign, color: owed > 0 ? 'text-destructive' : prepaid > 0 ? 'text-success' : 'text-muted-foreground' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60 text-right">
               <Icon className={cn('w-5 h-5 flex-shrink-0', color)} />
@@ -684,7 +688,7 @@ export default function StandDetail() {
                       ['تاريخ الانتهاء', formatDate(activeContract.end_date), activeContract.end_date && new Date(activeContract.end_date) < new Date() ? 'text-destructive' : 'text-foreground'],
                       ['قيمة العقد', formatCurrency(activeContract.total_value), 'text-primary font-black'],
                       ['المدفوع', formatCurrency(contractPaid(activeContract)), 'text-success font-bold'],
-                      ['مستحق الآن', formatCurrency(periodDue), periodDue > 0 ? 'text-destructive font-black' : 'text-success font-bold'],
+                      [owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', formatCurrency(owed > 0 ? owed : prepaid), owed > 0 ? 'text-destructive font-black' : prepaid > 0 ? 'text-success font-black' : 'text-muted-foreground'],
                       ['مدة العقد', `${activeContract.duration_months?activeContract.duration_months + "شهر" : 'غير محدد'}`, 'text-foreground'],
                     ].map(([k, v, cls]) => (
                       <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
@@ -937,8 +941,9 @@ export default function StandDetail() {
                         <TableCell>
                           {hasOwed ? (
                             <span className="inline-flex items-center gap-1 text-destructive font-bold text-sm">
-                              <span className="text-xs bg-destructive/10 border border-destructive/25 px-1.5 py-0.5 rounded">عليه</span>
+                              
                               {formatCurrency(owed)}
+                              <span className="text-xs bg-destructive/10 border border-destructive/25 px-1.5 py-0.5 rounded">عليه</span>
                             </span>
                           ) : hasCredit ? (
                             <span className="inline-flex items-center gap-1 text-success font-bold text-sm">

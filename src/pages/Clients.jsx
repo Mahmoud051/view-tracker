@@ -61,30 +61,44 @@ export default function Clients() {
     const cts = contractsMap[clientId] || []
     const active = cts.filter(c => computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
 
-    // totalValue: handle open contracts by calculating elapsed period value
-    const INTERVAL_FOR_TOTAL = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
-    const nowForTotal = new Date()
-    const totalValue = cts.reduce((a, c) => {
-      if (c.is_open) {
-        if (!c.start_date || !c.monthly_rate) return a + (paymentsMap[c.id] || 0)
-        const start = new Date(c.start_date)
-        const end = c.end_date ? new Date(c.end_date) : null
-        const nowCapped = end && nowForTotal > end ? end : nowForTotal
-        const intervalMonths = INTERVAL_FOR_TOTAL[c.payment_frequency || 'monthly'] || 1
-        const periodRate = safeNum(c.monthly_rate) * intervalMonths
-        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
-        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
-        const periodsDue = Math.ceil(completeMonths / intervalMonths)
-        return a + (periodsDue * periodRate)
-      }
-      return a + safeNum(c.total_value)
-    }, 0)
-    const totalPaid = cts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
-    const owed = Math.max(0, totalValue - totalPaid)
-
-    // periodDue: sum across ALL contracts (not just active)
+    // Calculate total elapsed cost across all contracts
     const INTERVAL_MONTHS = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
     const now = new Date()
+    let totalElapsedCost = 0
+    
+    cts.forEach(c => {
+      if (!c.start_date) return
+      const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+      if (realStatus === 'upcoming') return
+      
+      const paymentFreq = c.payment_frequency || 'monthly'
+      const start = new Date(c.start_date)
+      const end = c.end_date ? new Date(c.end_date) : null
+      const nowCapped = end && now > end ? end : now
+      const isOpen = c.is_open || !c.end_date || !c.duration_months
+      const monthlyRate = isOpen && c.monthly_rate ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+      const intervalMonths = INTERVAL_MONTHS[paymentFreq] || 1
+      const periodRate = monthlyRate * intervalMonths
+      
+      let periodsDue
+      if (isOpen) {
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+        periodsDue = Math.ceil(completeMonths / intervalMonths)
+      } else {
+        const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+        periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+      }
+      totalElapsedCost += periodsDue * periodRate
+    })
+    
+    const totalPaid = cts.reduce((a, c) => a + (paymentsMap[c.id] || 0), 0)
+    const owed = Math.max(0, totalElapsedCost - totalPaid)
+    const prepaid = Math.max(0, totalPaid - totalElapsedCost)
+
+    // periodDue: sum across ALL contracts (not just active)
     let periodDue = 0
     cts.forEach(c => {
       if (!c.start_date) return
@@ -125,7 +139,7 @@ export default function Clients() {
       return nearest
     }, null)
 
-    return { active: active.length, total: cts.length, totalValue, totalPaid, owed, periodDue, nearestContract }
+    return { active: active.length, total: cts.length, totalElapsedCost, totalPaid, owed, prepaid, periodDue, nearestContract }
   }
 
   async function handleSave() {
@@ -199,18 +213,18 @@ export default function Clients() {
                     <p className="text-xs text-muted-foreground">نشط</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-foreground truncate">{formatCurrency(stats.totalValue).replace(' جنيه', '')}</p>
-                    <p className="text-xs text-muted-foreground">إجمالي حالي</p>
+                    <p className="text-sm font-bold text-foreground truncate">{formatCurrency(stats.totalElapsedCost).replace(' جنيه', '')}</p>
+                    <p className="text-xs text-muted-foreground">تكلفة الفترة</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-bold text-success truncate">{formatCurrency(stats.totalPaid).replace(' جنيه', '')}</p>
                     <p className="text-xs text-muted-foreground">المدفوع</p>
                   </div>
                   <div className="text-center">
-                    <p className={`text-sm font-bold truncate ${(stats.periodDue > 0 || stats.owed > 0) ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {formatCurrency(stats.periodDue > 0 ? stats.periodDue : stats.owed).replace(' جنيه', '')}
+                    <p className={`text-sm font-bold truncate ${stats.owed > 0 ? 'text-destructive' : stats.prepaid > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                      {formatCurrency(stats.owed > 0 ? stats.owed : stats.prepaid).replace(' جنيه', '')}
                     </p>
-                    <p className="text-xs text-muted-foreground">المتبقي</p>
+                    <p className="text-xs text-muted-foreground">{stats.owed > 0 ? 'عليه' : stats.prepaid > 0 ? 'له' : '—'}</p>
                   </div>
                 </div>
 

@@ -246,9 +246,11 @@ export default function Stands() {
                       )
                     }
                     const daysLeft = contract.end_date ? Math.ceil((new Date(contract.end_date) - new Date()) / 86400000) : null
-                    
-                    // Calculate period due amount
-                    let periodDue = 0
+
+                    // Calculate elapsed cost, owed, and prepaid
+                    let elapsedCost = 0
+                    let owed = 0
+                    let prepaid = 0
                     const contractStatus = computeContractStatus(contract.start_date, contract.end_date, contract.status)
                     if (contract.start_date && contractStatus !== 'upcoming') {
                       const now = new Date()
@@ -272,10 +274,12 @@ export default function Stands() {
                         const totalPeriods = Math.ceil((parseInt(contract.duration_months) || 1) / intervalMonths)
                         periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
                       }
+                      elapsedCost = periodsDue * periodRate
                       const paid = paymentsMap[contract.id] || 0
-                      periodDue = Math.max(0, periodsDue * periodRate - paid)
+                      owed = Math.max(0, elapsedCost - paid)
+                      prepaid = Math.max(0, paid - elapsedCost)
                     }
-                    
+
                     return (
                       <>
                         <div className="flex items-center gap-1.5">
@@ -292,10 +296,12 @@ export default function Stands() {
                             </span>
                           )}
                         </div>
-                        {periodDue > 0 && (
+                        {(owed > 0 || prepaid > 0) && (
                           <div className="flex items-center gap-1.5">
-                            <Wallet className="w-3.5 h-3.5 flex-shrink-0 text-destructive" />
-                            <p className="text-xs font-medium text-destructive">مستحق: {formatCurrency(periodDue)}</p>
+                            <Wallet className={cn('w-3.5 h-3.5 flex-shrink-0', owed > 0 ? 'text-destructive' : 'text-success')} />
+                            <p className={cn('text-xs font-medium', owed > 0 ? 'text-destructive' : 'text-success')}>
+                              {owed > 0 ? 'عليه' : 'له'}: {formatCurrency(owed > 0 ? owed : prepaid)}
+                            </p>
                           </div>
                         )}
                       </>
