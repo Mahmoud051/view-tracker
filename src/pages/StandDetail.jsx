@@ -7,7 +7,7 @@ import {
   ToggleLeft, ToggleRight, Image as ImageIcon, Shield, ScrollText, BarChart3, History, Users, ChevronRight, Maximize2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr, getCurrentMonthlyGovRent } from '@/lib/utils'
+import { formatDate, formatCurrency, computeGovStatus, computeContractStatus, safeNum, cn, toLocalDateStr, getCurrentMonthlyGovRent, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -689,7 +689,7 @@ export default function StandDetail() {
                       ['قيمة العقد', formatCurrency(activeContract.total_value), 'text-primary font-black'],
                       ['المدفوع', formatCurrency(contractPaid(activeContract)), 'text-success font-bold'],
                       [owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', formatCurrency(owed > 0 ? owed : prepaid), owed > 0 ? 'text-destructive font-black' : prepaid > 0 ? 'text-success font-black' : 'text-muted-foreground'],
-                      ['مدة العقد', `${activeContract.duration_months?activeContract.duration_months + "شهر" : 'غير محدد'}`, 'text-foreground'],
+                      ['مدة العقد', `${activeContract.duration_months ? toArabicNumbers(activeContract.duration_months) + "شهر" : 'غير محدد'}`, 'text-foreground'],
                     ].map(([k, v, cls]) => (
                       <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
                         <p className="text-xs text-muted-foreground mb-1">{k}</p>
@@ -768,7 +768,7 @@ export default function StandDetail() {
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                   <History className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-base">سجل جميع العقود ({contracts.length})</CardTitle>
+                <CardTitle className="text-base">سجل جميع العقود ({toArabicNumbers(contracts.length)})</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -894,7 +894,7 @@ export default function StandDetail() {
             <StatCard title="الإيرادات (6 أشهر)" value={formatCurrency(recentRevenue)} icon={BarChart3} variant="success" />
             <StatCard title="إجمالي العقود" value={contracts.length} icon={FileText} variant="info" />
             <StatCard title="إجمالي المدفوع" value={formatCurrency(contracts.reduce((a, c) => a + contractPaid(c), 0))} icon={DollarSign} variant="default" />
-            <StatCard title="إجمالي مستحق" value={formatCurrency(contracts.reduce((a, c) => a + Math.max(0, contractTotalValue(c) - contractPaid(c)), 0))} icon={Clock} variant={recentRevenue > 0 ? 'danger' : 'warning'} />
+            <StatCard title="إجمالي عليه" value={formatCurrency(contracts.reduce((a, c) => a + Math.max(0, contractTotalValue(c) - contractPaid(c)), 0))} icon={Clock} variant={recentRevenue > 0 ? 'danger' : 'warning'} />
           </div>
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />

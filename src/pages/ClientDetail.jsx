@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Save, X, Phone, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, computeContractStatus } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, computeContractStatus, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -206,7 +206,7 @@ export default function ClientDetail() {
       {/* Contracts table */}
       <Card>
         <CardHeader>
-          <CardTitle>جميع العقود ({contracts.length})</CardTitle>
+          <CardTitle>جميع العقود ({toArabicNumbers(contracts.length)})</CardTitle>
         </CardHeader>
         <CardContent>
           {contracts.length === 0 ? (
@@ -274,7 +274,7 @@ export default function ClientDetail() {
                           {c.is_open ? (
                             <span className="text-xs font-medium text-info">مفتوح</span>
                           ) : (
-                            <span>{c.duration_months} شهر</span>
+                            <span>{toArabicNumbers(c.duration_months)} شهر</span>
                           )}
                         </TableCell>
                         <TableCell>{formatDate(c.start_date)}</TableCell>

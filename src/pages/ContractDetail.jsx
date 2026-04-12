@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr, paymentIntervalMonths, getDurationCompatibilityError } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr, paymentIntervalMonths, getDurationCompatibilityError, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -485,7 +485,7 @@ export default function ContractDetail() {
         <StatCard title="قيمة العقد" value={contract.is_open ? '—' : formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
         <StatCard 
           title="مدة العقد" 
-          value={contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`} 
+          value={contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} شهر`} 
           icon={CreditCard} 
           variant="info" 
         />
@@ -493,8 +493,8 @@ export default function ContractDetail() {
           title="الفترة المنقضية" 
           value={
             <span>
-              {elapsedMonths} شهر
-              {extraDays > 0 && <span className="text-xs text-muted-foreground ms-1">و{extraDays} يوم</span>}
+              {toArabicNumbers(elapsedMonths)} شهر
+              {extraDays > 0 && <span className="text-xs text-muted-foreground ms-1">و{toArabicNumbers(extraDays)} يوم</span>}
             </span>
           } 
           icon={CreditCard} 
@@ -520,7 +520,7 @@ export default function ContractDetail() {
               ['العنوان', contract.stands?.address],
               ['العميل', contract.clients?.name],
               ['الهاتف', contract.clients?.phone],
-              ['نوع العقد', contract.is_open ? 'مفتوح' : `${contract.duration_months || '—'} شهر`],
+              ['نوع العقد', contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} شهر`],
               ['فترة الدفع', INTERVAL_LABELS[contract.payment_frequency]?.split('(')[0].trim() || paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency],
               ['السعر الشهري', contract.monthly_rate ? formatCurrency(contract.monthly_rate) : '—'],
               ['قيمة الدفعة', contract.price_per_period ? formatCurrency(contract.price_per_period) : (contract.is_open ? formatCurrency(contract.monthly_rate * INTERVAL_MONTHS[contract.payment_frequency]) : '—')],
@@ -577,7 +577,7 @@ export default function ContractDetail() {
                 <TableBody>
                   {payments.map((p, i) => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium text-muted-foreground">{toArabicNumbers(i + 1)}</TableCell>
                       <TableCell>{formatDate(p.payment_date)}</TableCell>
                       <TableCell className="font-semibold text-success">{formatCurrency(p.amount)}</TableCell>
                       <TableCell>

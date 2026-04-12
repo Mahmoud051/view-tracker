@@ -1,5 +1,5 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog'
-import { cn, statusLabels } from '@/lib/utils'
+import { cn, statusLabels, toArabicNumbers } from '@/lib/utils'
 import { Button } from './button'
 import { Badge } from './badge'
 import { Card, CardContent } from './card'
@@ -134,6 +134,10 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
     danger: 'bg-destructive/10 text-destructive',
     info: 'bg-info/10 text-info',
   }
+  
+  // Convert numeric values to Arabic numbers
+  const displayValue = typeof value === 'number' ? toArabicNumbers(value) : value
+  
   return (
     <Card className={cn('overflow-hidden rounded-xl shadow-sm card-hover', variants[variant] || variants.default, className)}>
       <CardContent className="flex flex-row-reverse items-center gap-3 p-4">
@@ -144,7 +148,7 @@ export function StatCard({ title, value, icon: Icon, description, variant = 'def
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-medium text-muted-foreground leading-tight">{title}</p>
-          <p className="mt-0.5 break-words text-lg font-bold text-foreground leading-tight">{value}</p>
+          <p className="mt-0.5 break-words text-lg font-bold text-foreground leading-tight">{displayValue}</p>
           {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
         </div>
       </CardContent>

@@ -9,6 +9,13 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
+// Convert English numbers to Arabic numbers
+export function toArabicNumbers(str) {
+  if (!str) return ''
+  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩']
+  return String(str).replace(/[0-9]/g, d => arabicDigits[d])
+}
+
 // Format date to Arabic locale DD/MM/YYYY
 export function formatDate(date) {
   if (!date) return '—'
@@ -22,8 +29,9 @@ export function formatDate(date) {
 
 // Format currency in EGP
 export function formatCurrency(amount) {
-  if (amount === null || amount === undefined) return '0 جنيه'
-  return `${Number(amount).toLocaleString('ar-EG')} جنيه`
+  if (amount === null || amount === undefined) return '٠ جنيه'
+  const numStr = Number(amount).toLocaleString('en-US')
+  return toArabicNumbers(numStr) + ' جنيه'
 }
 
 // Days remaining from today until a date

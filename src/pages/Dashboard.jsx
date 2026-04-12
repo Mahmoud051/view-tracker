@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, Users, CheckCircle, AlertCircle, TrendingUp, Bell, FileText, PieChart as PieChartIcon, Wrench, CreditCard } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, daysRemaining, getLast12MonthsLabels, safeNum, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod, getCurrentMonthlyGovRent } from '@/lib/utils'
+import { formatDate, formatCurrency, daysRemaining, getLast12MonthsLabels, safeNum, toLocalDateStr, computeContractStatus, calculateGovRentForPeriod, getCurrentMonthlyGovRent, toArabicNumbers } from '@/lib/utils'
 import { StatCard, LoadingScreen, PageHeader } from '@/components/ui/shared'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 

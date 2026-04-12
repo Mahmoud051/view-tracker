@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Users, Phone, FileText, Building2, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, safeNum, computeContractStatus } from '@/lib/utils'
+import { formatCurrency, formatDate, safeNum, computeContractStatus, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -163,7 +163,7 @@ export default function Clients() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="العملاء" description={`${clients.length} عميل`}>
+      <PageHeader title="العملاء" description={`${toArabicNumbers(clients.length)} عميل`}>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4" /> إضافة عميل
         </Button>
@@ -209,20 +209,20 @@ export default function Clients() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-2 py-3 border-t border-border">
                   <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">{stats.active}</p>
+                    <p className="text-lg font-bold text-foreground">{toArabicNumbers(stats.active)}</p>
                     <p className="text-xs text-muted-foreground">نشط</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-foreground truncate">{formatCurrency(stats.totalElapsedCost).replace(' جنيه', '')}</p>
+                    <p className="text-sm font-bold text-foreground truncate">{formatCurrency(stats.totalElapsedCost)}</p>
                     <p className="text-xs text-muted-foreground">تكلفة الفترة</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-success truncate">{formatCurrency(stats.totalPaid).replace(' جنيه', '')}</p>
+                    <p className="text-sm font-bold text-success truncate">{formatCurrency(stats.totalPaid)}</p>
                     <p className="text-xs text-muted-foreground">المدفوع</p>
                   </div>
                   <div className="text-center">
                     <p className={`text-sm font-bold truncate ${stats.owed > 0 ? 'text-destructive' : stats.prepaid > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-                      {formatCurrency(stats.owed > 0 ? stats.owed : stats.prepaid).replace(' جنيه', '')}
+                      {formatCurrency(stats.owed > 0 ? stats.owed : stats.prepaid)}
                     </p>
                     <p className="text-xs text-muted-foreground">{stats.owed > 0 ? 'عليه' : stats.prepaid > 0 ? 'له' : '—'}</p>
                   </div>
@@ -237,7 +237,7 @@ export default function Clients() {
                       <p className="text-xs text-muted-foreground">ينتهي: {formatDate(stats.nearestContract.end_date)}</p>
                     </div>
                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${stats.nearestContract.daysLeft <= 30 ? 'bg-destructive/15 text-destructive' : stats.nearestContract.daysLeft <= 90 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success'}`}>
-                      {stats.nearestContract.daysLeft} يوم
+                      {toArabicNumbers(stats.nearestContract.daysLeft)} يوم
                     </span>
                   </div>
                 )}

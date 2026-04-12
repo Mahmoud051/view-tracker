@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Search, FileText, UserPlus, X, ChevronDown, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn, paymentIntervalMonths, getDurationCompatibilityError } from '@/lib/utils'
+import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn, paymentIntervalMonths, getDurationCompatibilityError, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -394,7 +394,7 @@ export default function Contracts() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="العقود" description={`${contracts.length} عقد إجمالاً`}>
+      <PageHeader title="العقود" description={`${toArabicNumbers(contracts.length)} عقد إجمالاً`}>
         <Button onClick={() => setDialogOpen(true)}><Plus className="w-4 h-4" /> عقد جديد</Button>
       </PageHeader>
 
@@ -481,7 +481,7 @@ export default function Contracts() {
                         </p>
                         <p className="text-xs text-muted-foreground">{c.clients?.phone}</p>
                       </TableCell>
-                      <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${c.duration_months} شهر`}</TableCell>
+                      <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${toArabicNumbers(c.duration_months)} شهر`}</TableCell>
                       <TableCell className="text-sm">{formatDate(c.start_date)}</TableCell>
                       <TableCell className="text-sm">
                         {c.is_open ? (
