@@ -13,6 +13,7 @@ import Contracts from '@/pages/Contracts'
 import ContractDetail from '@/pages/ContractDetail'
 import ExpiryAlerts from '@/pages/ExpiryAlerts'
 import Reports from '@/pages/Reports'
+import StandsExport from '@/pages/StandsExport'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/contracts/:id" element={<ContractDetail />} />
                 <Route path="/expiry-alerts" element={<ExpiryAlerts />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/stands-export" element={<StandsExport />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

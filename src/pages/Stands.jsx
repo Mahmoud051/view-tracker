@@ -16,6 +16,7 @@ import { PageHeader, StatusBadge, EmptyState, LoadingScreen, FormField } from '@
 
 const buildEmptyForm = () => ({
   code: '', address: '', width: '', height: '', sides: '1', desc: '',
+  export_price: '',
   gov_license_number: '', gov_rental_start: todayStr(), gov_rental_end: '', gov_rental_cost: '',
 })
 
@@ -107,6 +108,7 @@ export default function Stands() {
         height: parseFloat(form.height),
         sides: parseInt(form.sides) || 1,
         desc: form.desc.trim() || null,
+        export_price: parseFloat(form.export_price) || null,
         gov_license_number: form.gov_license_number || null,
         gov_rental_start: form.gov_rental_start || null,
         gov_rental_end: form.gov_rental_end || null,
@@ -233,6 +235,12 @@ export default function Stands() {
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                     <p className="text-xs line-clamp-2">{stand.address}</p>
                   </div>
+                  {stand.export_price && (
+                    <div className="flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5 flex-shrink-0 text-success" />
+                      <p className="text-xs font-medium text-success">سعر التصدير: {formatCurrency(stand.export_price)}</p>
+                    </div>
+                  )}
                   {(() => {
                     // Show active contract first, fall back to upcoming
                     const contract = contracts.find(c => c.stand_id === stand.id && computeContractStatus(c.start_date, c.end_date, c.status) === 'active')
@@ -353,6 +361,10 @@ export default function Stands() {
             </FormField>
             <FormField label="الوصف" className="sm:col-span-2">
               <Textarea value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })} placeholder="وصف اللوحة والموقع..." />
+            </FormField>
+            <FormField label="سعر التصدير (جنيه)" className="sm:col-span-2">
+              <Input type="number" value={form.export_price} onChange={e => setForm({ ...form, export_price: e.target.value })} placeholder="يُظهر في PDF التصدير فقط" />
+              <p className="text-xs text-muted-foreground mt-1">هذا السعر سيظهر فقط في ملف PDF عند التصدير - لا يؤثر على العقود</p>
             </FormField>
             <FormField label="صورة اللوحة" className="sm:col-span-2">
               <Input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])} />

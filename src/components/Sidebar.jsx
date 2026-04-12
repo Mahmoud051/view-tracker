@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, Users, FileText,
-  Bell, BarChart3, LogOut, Sun, Moon, Menu, X, Eye
+  Bell, BarChart3, LogOut, Sun, Moon, Menu, X, Eye, Download
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -15,7 +15,10 @@ const navItems = [
   { to: '/clients', icon: Users, label: 'العملاء' },
   { to: '/contracts', icon: FileText, label: 'العقود' },
   { to: '/expiry-alerts', icon: Bell, label: 'تنبيهات الانتهاء' },
+
   { to: '/reports', icon: BarChart3, label: 'التقارير' },
+    { to: '/stands-export', icon: Download, label: 'تصدير اللوحات' },
+
 ]
 
 function SidebarContent({ onClose, className, showCloseButton = true }) {

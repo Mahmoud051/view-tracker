@@ -61,7 +61,7 @@ export default function StandDetail() {
       supabase.from('gov_rental_history').select('*').eq('stand_id', id).order('start_date', { ascending: false }),
     ])
     setStand(s)
-    setInfoForm({ code: s?.code || '', address: s?.address || '', width: s?.width || '', height: s?.height || '', sides: s?.sides || 1, desc: s?.desc || '' })
+    setInfoForm({ code: s?.code || '', address: s?.address || '', width: s?.width || '', height: s?.height || '', sides: s?.sides || 1, desc: s?.desc || '', export_price: s?.export_price || '' })
     setGovForm({
       gov_license_number: s?.gov_license_number || '',
       gov_rental_start: s?.gov_rental_start || '',
@@ -165,6 +165,7 @@ export default function StandDetail() {
         height: parseFloat(infoForm.height),
         sides: parseInt(infoForm.sides) || 1,
         desc: infoForm.desc?.trim() || null,
+        export_price: parseFloat(infoForm.export_price) || null,
       }
       if (photoFile) {
         const fileName = `${Date.now()}-${photoFile.name}`
@@ -387,12 +388,13 @@ export default function StandDetail() {
         </div>
 
         {/* Stats ribbon */}
-        <div className="px-6 pb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="px-6 pb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'الأبعاد', value: `${safeNum(stand.width)} × ${safeNum(stand.height)} م`, icon: Ruler, color: 'text-primary' },
             { label: 'المساحة', value: `${safeNum(stand.width) * safeNum(stand.height)} م²`, icon: Building2, color: 'text-info' },
             { label: 'الأوجه', value: stand.sides == 2 ? 'وجهين' : 'وجه واحد', icon: FileText, color: 'text-warning' },
             { label: owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', value: formatCurrency(owed > 0 ? owed : prepaid), icon: DollarSign, color: owed > 0 ? 'text-destructive' : prepaid > 0 ? 'text-success' : 'text-muted-foreground' },
+            { label: 'سعر التصدير', value: stand.export_price ? formatCurrency(stand.export_price) : 'غير محدد', icon: DollarSign, color: stand.export_price ? 'text-success' : 'text-muted-foreground' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60 text-right">
               <Icon className={cn('w-5 h-5 flex-shrink-0', color)} />
@@ -470,6 +472,10 @@ export default function StandDetail() {
                   <FormField label="كود اللوحة"><Input value={infoForm.code} onChange={e => setInfoForm({...infoForm, code: e.target.value})} /></FormField>
                   <FormField label="العنوان" className="sm:col-span-2"><Input value={infoForm.address} onChange={e => setInfoForm({...infoForm, address: e.target.value})} /></FormField>
                   <FormField label="الوصف" className="sm:col-span-2"><Textarea value={infoForm.desc} onChange={e => setInfoForm({...infoForm, desc: e.target.value})} placeholder="وصف اللوحة والموقع..." /></FormField>
+                  <FormField label="سعر التصدير (جنيه)" className="sm:col-span-2">
+                    <Input type="number" value={infoForm.export_price} onChange={e => setInfoForm({...infoForm, export_price: e.target.value})} placeholder="يُظهر في PDF التصدير فقط" />
+                    <p className="text-xs text-muted-foreground mt-1">هذا السعر سيظهر فقط في ملف PDF عند التصدير - لا يؤثر على العقود</p>
+                  </FormField>
                   <FormField label="الطول (م)"><Input type="text" inputMode="decimal" value={infoForm.width} onChange={e => updateInfoMeasurement('width', e.target.value)} /></FormField>
                   <FormField label="العرض (م)"><Input type="text" inputMode="decimal" value={infoForm.height} onChange={e => updateInfoMeasurement('height', e.target.value)} /></FormField>
                   <FormField label="عدد الأوجه">
