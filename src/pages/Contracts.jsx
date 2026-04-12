@@ -493,7 +493,11 @@ export default function Contracts() {
                         <p className="text-xs text-muted-foreground truncate max-w-[120px]">{c.stands?.address}</p>
                       </TableCell>
                       <TableCell>
-                        <p className="font-medium text-sm">{c.clients?.name}</p>
+                        <p className="font-medium text-sm">
+                          {c.clients?.name?.length > 25
+                            ? `${c.clients.name.substring(0, 25)}...` 
+                            : c.clients?.name}
+                        </p>
                         <p className="text-xs text-muted-foreground">{c.clients?.phone}</p>
                       </TableCell>
                       <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${c.duration_months} شهر`}</TableCell>
