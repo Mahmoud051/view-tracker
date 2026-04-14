@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileDown, Building2, MapPin, Eye, EyeOff, Download, Image, ImageOff } from 'lucide-react'
+import { FileDown, Building2, MapPin, Eye, EyeOff, Download, Image as ImageIcon, ImageOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, safeNum, cn, computeContractStatus, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -379,7 +379,7 @@ export default function StandsExport() {
                         {statusInfo.labelAr}
                       </Badge>
                       {stand.photo_url ? (
-                        <Image className="w-4 h-4 text-green-500" />
+                        <ImageIcon className="w-4 h-4 text-green-500" />
                       ) : (
                         <ImageOff className="w-4 h-4 text-red-400" />
                       )}
