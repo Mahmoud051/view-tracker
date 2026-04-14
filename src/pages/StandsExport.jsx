@@ -117,22 +117,22 @@ export default function StandsExport() {
       background: #fff; 
       padding: 5px; 
     }
-    .header { 
-      text-align: center; 
-      border-bottom: 3px solid #1E3A5F; 
-      padding-bottom: 20px; 
-      margin-bottom: 30px; 
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #1E3A5F;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
     }
-    .company { 
-      font-size: 36px; 
-      font-weight: 900; 
-      color: #1E3A5F; 
-      letter-spacing: -1px; 
+    .company {
+      font-size: 24px;
+      font-weight: 900;
+      color: #1E3A5F;
+      letter-spacing: -1px;
     }
-    .subtitle { 
-      font-size: 14px; 
-      color: #64748b; 
-      margin-top: 4px; 
+    .subtitle {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
     }
     .page {
       page-break-after: always;
@@ -144,6 +144,9 @@ export default function StandsExport() {
     }
     .page:last-child {
       page-break-after: auto;
+    }
+    .page.first-page {
+      height: 850px;
     }
     .card {
       border: 2px solid #e2e8f0;
@@ -242,17 +245,16 @@ export default function StandsExport() {
 <body>
   <div class="header">
     <div class="company">ڤيو</div>
-    <div class="subtitle">${includePrice ? 'نظرة عامة على اللوحات' : 'اللوحات المتاحة للإيجار'}</div>
-    <div style="font-size:13px;color:#64748b;margin-top:6px;">الإجمالي: ${toArabicNumbers(filteredStands.length)} لوحة</div>
-    <div style="font-size:12px;color:#94a3b8;">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}</div>
+    <div class="subtitle">${includePrice ? 'نظرة عامة على اللوحات' : 'اللوحات المتاحة للإيجار'} — الإجمالي: ${toArabicNumbers(filteredStands.length)} لوحة — تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}</div>
   </div>
 
   ${(() => {
     const pages = [];
+    let isFirstPage = true;
     for (let i = 0; i < filteredStands.length; i += 2) {
       const pageStands = filteredStands.slice(i, i + 2);
       pages.push(`
-  <div class="page">
+  <div class="page${isFirstPage ? ' first-page' : ''}">
     ${pageStands.map(stand => {
       const statusInfo = getStandStatus(stand)
       const isRented = statusInfo.status !== 'available'
@@ -269,6 +271,7 @@ export default function StandsExport() {
     </div>`
     }).join('')}
   </div>`);
+      isFirstPage = false;
     }
     return pages.join('');
   })()}
