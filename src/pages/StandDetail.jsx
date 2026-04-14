@@ -394,7 +394,7 @@ export default function StandDetail() {
             { label: 'المساحة', value: `${safeNum(stand.width) * safeNum(stand.height)} م²`, icon: Building2, color: 'text-info' },
             { label: 'الأوجه', value: stand.sides == 2 ? 'وجهين' : 'وجه واحد', icon: FileText, color: 'text-warning' },
             { label: owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', value: formatCurrency(owed > 0 ? owed : prepaid), icon: DollarSign, color: owed > 0 ? 'text-destructive' : prepaid > 0 ? 'text-success' : 'text-muted-foreground' },
-            { label: 'سعر التصدير', value: stand.export_price ? formatCurrency(stand.export_price) : 'غير محدد', icon: DollarSign, color: stand.export_price ? 'text-success' : 'text-muted-foreground' },
+            { label: 'سعر الإيجار', value: stand.export_price ? formatCurrency(stand.export_price) : 'غير محدد', icon: DollarSign, color: stand.export_price ? 'text-success' : 'text-muted-foreground' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="flex items-center gap-3 bg-muted/60 rounded-xl px-4 py-3 border border-border/60 text-right">
               <Icon className={cn('w-5 h-5 flex-shrink-0', color)} />
@@ -472,7 +472,7 @@ export default function StandDetail() {
                   <FormField label="كود اللوحة"><Input value={infoForm.code} onChange={e => setInfoForm({...infoForm, code: e.target.value})} /></FormField>
                   <FormField label="العنوان" className="sm:col-span-2"><Input value={infoForm.address} onChange={e => setInfoForm({...infoForm, address: e.target.value})} /></FormField>
                   <FormField label="الوصف" className="sm:col-span-2"><Textarea value={infoForm.desc} onChange={e => setInfoForm({...infoForm, desc: e.target.value})} placeholder="وصف اللوحة والموقع..." /></FormField>
-                  <FormField label="سعر التصدير (جنيه)" className="sm:col-span-2">
+                  <FormField label="سعر الإيجار (جنيه)" className="sm:col-span-2">
                     <Input type="number" value={infoForm.export_price} onChange={e => setInfoForm({...infoForm, export_price: e.target.value})} placeholder="يُظهر في PDF التصدير فقط" />
                     <p className="text-xs text-muted-foreground mt-1">هذا السعر سيظهر فقط في ملف PDF عند التصدير - لا يؤثر على العقود</p>
                   </FormField>

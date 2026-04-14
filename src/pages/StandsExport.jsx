@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileDown, Building2, MapPin, Eye, EyeOff, Download } from 'lucide-react'
+import { FileDown, Building2, MapPin, Eye, EyeOff, Download, Image, ImageOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, safeNum, cn, computeContractStatus, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -378,10 +378,10 @@ export default function StandsExport() {
                       >
                         {statusInfo.labelAr}
                       </Badge>
-                      {isRented ? (
-                        <EyeOff className="w-4 h-4 text-destructive" />
+                      {stand.photo_url ? (
+                        <Image className="w-4 h-4 text-green-500" />
                       ) : (
-                        <Eye className="w-4 h-4 text-success" />
+                        <ImageOff className="w-4 h-4 text-red-400" />
                       )}
                     </div>
 
@@ -402,7 +402,7 @@ export default function StandsExport() {
                       )}
                       {showPrice && stand.export_price && (
                         <div className="pt-2 border-t border-border">
-                          <span className="text-sm text-muted-foreground">سعر التصدير: </span>
+                          <span className="text-sm text-muted-foreground">سعر الإيجار: </span>
                           <span className="font-bold text-success">
                             {formatCurrency(stand.export_price)}
                           </span>

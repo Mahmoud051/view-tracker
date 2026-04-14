@@ -238,7 +238,7 @@ export default function Stands() {
                   {stand.export_price && (
                     <div className="flex items-center gap-1.5">
                       <Wallet className="w-3.5 h-3.5 flex-shrink-0 text-success" />
-                      <p className="text-xs font-medium text-success">سعر التصدير: {formatCurrency(stand.export_price)}</p>
+                      <p className="text-xs font-medium text-success">سعر الإيجار: {formatCurrency(stand.export_price)}</p>
                     </div>
                   )}
                   {(() => {
@@ -362,7 +362,7 @@ export default function Stands() {
             <FormField label="الوصف" className="sm:col-span-2">
               <Textarea value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })} placeholder="وصف اللوحة والموقع..." />
             </FormField>
-            <FormField label="سعر التصدير (جنيه)" className="sm:col-span-2">
+            <FormField label="سعر الإيجار (جنيه)" className="sm:col-span-2">
               <Input type="number" value={form.export_price} onChange={e => setForm({ ...form, export_price: e.target.value })} placeholder="يُظهر في PDF التصدير فقط" />
               <p className="text-xs text-muted-foreground mt-1">هذا السعر سيظهر فقط في ملف PDF عند التصدير - لا يؤثر على العقود</p>
             </FormField>
