@@ -115,7 +115,7 @@ export default function StandsExport() {
       direction: rtl; 
       color: #1e293b; 
       background: #fff; 
-      padding: 40px; 
+      padding: 5px; 
     }
     .header { 
       text-align: center; 
@@ -134,16 +134,25 @@ export default function StandsExport() {
       color: #64748b; 
       margin-top: 4px; 
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
+    .page {
+      page-break-after: always;
+      page-break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 950px;
+    }
+    .page:last-child {
+      page-break-after: auto;
     }
     .card {
       border: 2px solid #e2e8f0;
       border-radius: 8px;
       overflow: hidden;
-      page-break-inside: avoid;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
     .card.available {
       border-color: #10b981;
@@ -155,9 +164,18 @@ export default function StandsExport() {
     }
     .card-image {
       width: 100%;
-      height: 500px;
-      object-fit: cover;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: #e2e8f0;
+    }
+    .card-image img {
+      width: auto;
+      height: 100%;
+      max-width: 100%;
+      display: block;
     }
     .card-content {
       padding: 12px;
@@ -211,12 +229,13 @@ export default function StandsExport() {
       color: #94a3b8; 
     }
     @media print {
-      .grid { grid-template-columns: repeat(2, 1fr); }
+      .page { page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
       .card { page-break-inside: avoid; }
     }
     @page {
       size: portrait;
-      margin: 20mm;
+      margin: 5mm;
     }
   </style>
 </head>
@@ -228,13 +247,18 @@ export default function StandsExport() {
     <div style="font-size:12px;color:#94a3b8;">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}</div>
   </div>
 
-  <div class="grid">
-    ${filteredStands.map(stand => {
+  ${(() => {
+    const pages = [];
+    for (let i = 0; i < filteredStands.length; i += 2) {
+      const pageStands = filteredStands.slice(i, i + 2);
+      pages.push(`
+  <div class="page">
+    ${pageStands.map(stand => {
       const statusInfo = getStandStatus(stand)
       const isRented = statusInfo.status !== 'available'
       return `
     <div class="card ${isRented ? 'rented' : 'available'}">
-      ${stand.photo_url ? `<img src="${stand.photo_url}" class="card-image" alt="${stand.code}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22500%22><rect fill=%22%23e2e8f0%22 width=%22400%22 height=%22500%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22Cairo,Arial%22 font-size=%2224%22 fill=%22%2394a3b8%22>لا توجد صورة</text></svg>'"/>` : `<div class="card-image" style="display:flex;align-items:center;justify-content:center;background:#e2e8f0;"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`}
+      ${stand.photo_url ? `<div class="card-image"><img src="${stand.photo_url}" alt="${stand.code}" onerror="this.parentElement.innerHTML='<span style=\\'color:#94a3b8;font-size:18px;text-align:center;padding:20px;\\'>لا توجد صورة لهذه اللوحة بعد</span>'"/></div>` : `<div class="card-image"><span style="color:#94a3b8;font-size:18px;text-align:center;padding:20px;">لا توجد صورة لهذه اللوحة بعد</span></div>`}
       <div class="card-content">
         <div class="card-code">${stand.code || '—'}</div>
         ${stand.width && stand.height ? `<div class="card-dimensions">${toArabicNumbers(stand.width)}م × ${toArabicNumbers(stand.height)}م</div>` : ''}
@@ -244,7 +268,10 @@ export default function StandsExport() {
       </div>
     </div>`
     }).join('')}
-  </div>
+  </div>`);
+    }
+    return pages.join('');
+  })()}
 
   <div class="footer">
     ڤيو — نظام إدارة اللوحات الإعلانية © ${new Date().getFullYear()}
@@ -293,39 +320,7 @@ export default function StandsExport() {
         </Button>
       </PageHeader>
 
-      {/* Export Options Card */}
-      <Card className="border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileDown className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-foreground mb-2">خيارات التصدير</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <EyeOff className="w-5 h-5 text-muted-foreground" />
-                    <h4 className="font-medium text-foreground">تصدير داخلي</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    يعرض اللوحات المتاحة والمؤجرة بدون الأسعار - للاستخدام الداخلي
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Eye className="w-5 h-5 text-primary" />
-                    <h4 className="font-medium text-foreground">تصدير للعملاء</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    يعرض جميع التفاصيل بما في ذلك الأسعار - مناسب للعرض على العملاء
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Preview Table */}
       <Card>
