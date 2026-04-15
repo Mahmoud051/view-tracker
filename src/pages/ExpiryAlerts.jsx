@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, Download, AlertTriangle, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { exportExcelFile, formatDate, formatCurrency, daysRemaining, safeNum, toLocalDateStr, addDays } from '@/lib/utils'
+import { exportExcelFile, formatDate, formatCurrency, daysRemaining, safeNum, toLocalDateStr, addDays, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
