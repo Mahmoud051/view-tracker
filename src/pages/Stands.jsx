@@ -305,12 +305,9 @@ export default function Stands() {
                 </div>
                 {/* Info */}
                 <div className={cn("p-4 space-y-2", isInactive && "opacity-60")}>
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-bold text-foreground">{stand.code}</h4>
-                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <Ruler className="w-3 h-3" />
-                      {(stand.width * stand.height).toFixed(0)} م²
-                    </span>
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <h4 className="font-bold text-foreground py-0.5 flex-1 min-w-0 text-[length:clamp(0.5rem,5cqi,0.8rem)] leading-tight">{stand.code}</h4>
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1 flex-shrink-0"><Ruler className="w-3 h-3" />{(stand.width * stand.height).toFixed(0)} م²</span>
                   </div>
                   <div className="flex items-start gap-1.5 text-muted-foreground">
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
