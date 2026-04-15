@@ -55,7 +55,7 @@ export default function Clients() {
     !search ||
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search)
-  )
+  ).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 
   function clientStats(clientId) {
     const cts = contractsMap[clientId] || []
