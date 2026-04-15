@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle } from 'lucide-react'
+import { ArrowRight, Plus, XCircle, FileDown, CreditCard, CheckCircle, Pencil, Trash2, PlayCircle, Building2, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatCurrency, safeNum, paymentMethodLabels, paymentFrequencyLabels, contractSerial, computeContractStatus, toLocalDateStr, paymentIntervalMonths, getDurationCompatibilityError, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -477,21 +477,12 @@ export default function ContractDetail() {
           <Button variant="outline" size="sm" onClick={printContract}>
             <FileDown className="w-4 h-4" /> طباعة / PDF
           </Button>
-        </div>
-        {/* Navigation Links */}
-        <div className="flex items-center gap-4 pt-3 border-t border-border mt-3">
-          <button
-            onClick={() => navigate(`/stands/${contract.stand_id}`)}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-          >
-            الذهاب إلى اللوحة <ArrowRight className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => navigate(`/clients/${contract.client_id}`)}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-          >
-            الذهاب إلى العميل <ArrowRight className="w-3 h-3" />
-          </button>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/stands/${contract.stand_id}`)}>
+            <Building2 className="w-4 h-4" /> لوحة
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${contract.client_id}`)}>
+            <User className="w-4 h-4" /> عميل
+          </Button>
         </div>
       </div>
 

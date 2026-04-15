@@ -82,9 +82,23 @@ export default function StandsExport() {
     }
   }
 
+  // Sort stands based on selected option
+  const sortedStands = (stands || []).slice().sort((a, b) => {
+    if (sortBy === 'az') return a.code.localeCompare(b.code, 'ar');
+    if (sortBy === 'status') {
+      const aStatus = getStandStatus(a).status;
+      const bStatus = getStandStatus(b).status;
+      // Available stands first
+      if (aStatus === 'available' && bStatus !== 'available') return -1;
+      if (aStatus !== 'available' && bStatus === 'available') return 1;
+      return a.code.localeCompare(b.code, 'ar');
+    }
+    return 0;
+  })
+
   const exportPDF = async (includePrice = true) => {
     // Filter stands based on price inclusion
-    const filteredStands = includePrice ? stands : stands
+    const filteredStands = sortedStands
 
     // Preload all images to ensure they're loaded before printing
     const imageLoadPromises = filteredStands
@@ -308,6 +322,15 @@ export default function StandsExport() {
         title="تصدير اللوحات"
         description={`${toArabicNumbers(stands.length)} لوحة إجمالاً`}
       >
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="ترتيب" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="az">أ-ي</SelectItem>
+            <SelectItem value="status">حسب الحالة</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           onClick={() => exportPDF(true)}
@@ -353,7 +376,7 @@ export default function StandsExport() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stands.map(stand => {
+            {sortedStands.map(stand => {
               const statusInfo = getStandStatus(stand)
               const isRented = statusInfo.status !== 'available'
 

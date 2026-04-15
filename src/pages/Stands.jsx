@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Plus, Search, Building2, MapPin, Calendar, User, Ruler, Wallet, Maximize2, X } from "lucide-react";
+import { Plus, Search, Building2, MapPin, Calendar, User, Ruler, Wallet, Maximize2, X, LayoutGrid } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn, formatDate, formatCurrency, computeGovStatus, computeContractStatus, todayStr, safeNum, paymentIntervalMonths } from "@/lib/utils";
 import { useToast } from "@/contexts/ToastContext";
@@ -39,6 +39,7 @@ export default function Stands() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("az");
   const [showInactive, setShowInactive] = useState(false);
+  const [gridCols, setGridCols] = useState(4);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(buildEmptyForm());
   const [formErrors, setFormErrors] = useState({});
@@ -80,6 +81,13 @@ export default function Stands() {
     return matchSearch && matchStatus;
   }).sort((a, b) => {
     if (sortBy === "az") return a.code.localeCompare(b.code, 'ar');
+    if (sortBy === "client") {
+      const aContract = contracts.find((c) => c.stand_id === a.id);
+      const bContract = contracts.find((c) => c.stand_id === b.id);
+      const aName = aContract?.clients?.name || '';
+      const bName = bContract?.clients?.name || '';
+      return aName.localeCompare(bName, 'ar');
+    }
     if (sortBy === "unpaid") {
       const aContract = contracts.find((c) => c.stand_id === a.id);
       const bContract = contracts.find((c) => c.stand_id === b.id);
@@ -228,11 +236,15 @@ export default function Stands() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="az">أ-ي</SelectItem>
+            <SelectItem value="client">بالعميل</SelectItem>
             <SelectItem value="unpaid">الأكثر مديونية</SelectItem>
           </SelectContent>
         </Select>
         <Button size="sm" variant={showInactive ? "default" : "outline"} onClick={() => setShowInactive((v) => !v)} className="gap-1.5">
           {showInactive ? "إخفاء المتوقفة" : "إظهار المتوقفة"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setGridCols((c) => (c === 4 ? 3 : 4))} className="gap-1.5" title={gridCols === 4 ? "عرض 3 أعمدة" : "عرض 4 أعمدة"}>
+          <LayoutGrid className="w-4 h-4" />
         </Button>
       </div>
 
@@ -251,7 +263,7 @@ export default function Stands() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className={cn("grid gap-4", gridCols === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")}>
           {filtered.map((stand) => {
             const isRented = rentedIds.has(stand.id) || contracts.some((c) => c.stand_id === stand.id && c.status === "upcoming");
             const govSt = computeGovStatus(stand.gov_rental_end);
@@ -307,7 +319,7 @@ export default function Stands() {
                   <div className="flex items-center gap-1.5">
                     <Wallet className={cn("w-3.5 h-3.5 flex-shrink-0", stand.export_price ? "text-success" : "text-muted-foreground")} />
 
-                    <p className={cn("text-xs font-medium", stand.export_price ? "text-success" : "text-muted-foreground")}>سعر الإيجار: {stand.export_price ? formatCurrency(stand.export_price) : "—"}</p>
+                    <p className={cn("text-xs font-medium", stand.export_price ? "text-success" : "text-muted-foreground")}> {stand.export_price ? "سعر الإيجار : " + formatCurrency(stand.export_price) : "—"}</p>
                   </div>
 
                   {(() => {
@@ -365,7 +377,7 @@ export default function Stands() {
                         </div>
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                           <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                          <p className="text-xs">{isTerminated || isExpired ? `منتهي` : contract ? `ينتهي : ${formatDate(contract.end_date)}` : "لم يؤجر من قبل"}</p>
+                          <p className="text-xs">{isTerminated || isExpired ? `منتهي` : contract ? `ينتهي : ${formatDate(contract.end_date)}` : "—"}</p>
                           {!isTerminated && !isExpired && daysLeft !== null && daysLeft > 0 && (
                             <span className={cn("text-xs font-medium px-1.5 py-0.5 rounded-full", daysLeft <= 30 ? "bg-destructive/15 text-destructive" : daysLeft <= 90 ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>
                               {daysLeft} يوم
