@@ -223,7 +223,14 @@ export default function ExpiryAlerts() {
                         <TableCell>{c.clients?.phone || '—'}</TableCell>
                         <TableCell>{formatDate(c.end_date)}</TableCell>
                         <TableCell>{days !== null ? urgencyBadge(days) : '—'}</TableCell>
-                        <TableCell className={balance >= 0 ? 'text-success font-medium' : 'text-destructive font-medium'}>{formatCurrency(Math.abs(balance))} {balance >= 0 ? 'له' : 'عليه'}</TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            'inline-flex items-center gap-1.5 text-xs font-medium',
+                            balance >= 0 ? 'bg-success/15 border border-success/30 text-success px-2 py-0.5 rounded-full' : 'bg-destructive/15 border border-destructive/30 text-destructive px-2 py-0.5 rounded-full'
+                          )}>
+                            {formatCurrency(Math.abs(balance))} {balance >= 0 ? 'له' : 'عليه'}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     )
                   })}
