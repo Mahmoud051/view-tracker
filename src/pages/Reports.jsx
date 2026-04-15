@@ -7,6 +7,7 @@ import { exportExcelFile, formatDate, formatCurrency, safeNum, statusLabels, toL
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/index'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/index'
 import { PageHeader, LoadingScreen, StatCard } from '@/components/ui/shared'
@@ -54,6 +55,12 @@ export default function Reports() {
   const [govFrom, setGovFrom] = useState(defaultFrom)
   const [govTo, setGovTo] = useState(defaultTo)
   const [govData, setGovData] = useState(null)
+
+  // Sorting states
+  const [revSortBy, setRevSortBy] = useState('total')
+  const [ctSortBy, setCtSortBy] = useState('stand')
+  const [mntSortBy, setMntSortBy] = useState('total')
+  const [govSortBy, setGovSortBy] = useState('total')
 
   useEffect(() => { fetchAll() }, [])
   useEffect(() => { fetchRevenue() }, [revFrom, revTo])
@@ -384,6 +391,15 @@ export default function Reports() {
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <DateRangeFilter from={revFrom} to={revTo} onFromChange={setRevFrom} onToChange={setRevTo} />
+                <Select value={revSortBy} onValueChange={setRevSortBy}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue placeholder="ترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">حسب المبلغ</SelectItem>
+                    <SelectItem value="az">أ-ي</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={exportRevExcel}>
                   <Download className="w-4 h-4" /> Excel
                 </Button>
@@ -409,7 +425,7 @@ export default function Reports() {
                   <TableRow><TableHead>كود اللوحة</TableHead><TableHead>العنوان</TableHead><TableHead>الإجمالي</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(revData?.byStand || []).sort((a,b) => b.total - a.total).map(s => (
+                  {(revData?.byStand || []).slice().sort((a, b) => revSortBy === 'az' ? a.code.localeCompare(b.code, 'ar') : b.total - a.total).map(s => (
                     <TableRow key={s.code}>
                       <TableCell className="font-semibold">{s.code}</TableCell>
                       <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{s.address?.slice(0,40)}</TableCell>
@@ -431,6 +447,15 @@ export default function Reports() {
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <DateRangeFilter from={ctFrom} to={ctTo} onFromChange={setCtFrom} onToChange={setCtTo} />
+                <Select value={ctSortBy} onValueChange={setCtSortBy}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue placeholder="ترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stand">باللوحة</SelectItem>
+                    <SelectItem value="client">بالعميل</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={exportCtExcel}>
                   <Download className="w-4 h-4" /> Excel
                 </Button>
@@ -455,7 +480,11 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(ctData?.contracts || []).map(c => {
+                    {(ctData?.contracts || []).slice().sort((a, b) => {
+                      if (ctSortBy === 'stand') return (a.stands?.code || '').localeCompare(b.stands?.code || '', 'ar');
+                      if (ctSortBy === 'client') return (a.clients?.name || '').localeCompare(b.clients?.name || '', 'ar');
+                      return 0;
+                    }).map(c => {
                       const paid = (c.payments||[]).reduce((a,p) => a+safeNum(p.amount),0)
                       const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
 
@@ -537,6 +566,15 @@ export default function Reports() {
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <DateRangeFilter from={mntFrom} to={mntTo} onFromChange={setMntFrom} onToChange={setMntTo} />
+                <Select value={mntSortBy} onValueChange={setMntSortBy}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue placeholder="ترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">حسب المبلغ</SelectItem>
+                    <SelectItem value="az">أ-ي</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={exportMntExcel}>
                   <Download className="w-4 h-4" /> Excel
                 </Button>
@@ -558,7 +596,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mntData.byStand.sort((a,b) => b.total - a.total).map(s => (
+                    {mntData.byStand.slice().sort((a, b) => mntSortBy === 'az' ? a.code.localeCompare(b.code, 'ar') : b.total - a.total).map(s => (
                       <TableRow key={s.code}>
                         <TableCell className="font-semibold">{s.code}</TableCell>
                         <TableCell className="font-medium">{formatCurrency(s.total)}</TableCell>
@@ -582,6 +620,15 @@ export default function Reports() {
               </CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <DateRangeFilter from={govFrom} to={govTo} onFromChange={setGovFrom} onToChange={setGovTo} />
+                <Select value={govSortBy} onValueChange={setGovSortBy}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue placeholder="ترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">حسب المبلغ</SelectItem>
+                    <SelectItem value="az">أ-ي</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={exportGovRentExcel}>
                   <Download className="w-4 h-4" /> Excel
                 </Button>
@@ -611,7 +658,7 @@ export default function Reports() {
                   <TableRow><TableHead>كود اللوحة</TableHead><TableHead>العنوان</TableHead><TableHead>الإجمالي في الفترة</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(govData?.byStand || []).sort((a,b) => b.total - a.total).map(s => (
+                  {(govData?.byStand || []).slice().sort((a, b) => govSortBy === 'az' ? a.code.localeCompare(b.code, 'ar') : b.total - a.total).map(s => (
                     <TableRow key={s.code}>
                       <TableCell className="font-semibold">{s.code}</TableCell>
                       <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{s.address?.slice(0,40)}</TableCell>
