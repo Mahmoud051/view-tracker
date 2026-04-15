@@ -622,6 +622,7 @@ export default function StandDetail() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead>من تاريخ</TableHead>
                       <TableHead>إلى تاريخ</TableHead>
+                      <TableHead>مدة العقد</TableHead>
                       <TableHead>المبلغ الشهري</TableHead>
                       <TableHead>التكلفة اليومية</TableHead>
                       <TableHead>ملاحظات</TableHead>
@@ -695,7 +696,7 @@ export default function StandDetail() {
                       ['قيمة العقد', formatCurrency(activeContract.total_value), 'text-primary font-black'],
                       ['المدفوع', formatCurrency(contractPaid(activeContract)), 'text-success font-bold'],
                       [owed > 0 ? 'عليه' : prepaid > 0 ? 'له' : '—', formatCurrency(owed > 0 ? owed : prepaid), owed > 0 ? 'text-destructive font-black' : prepaid > 0 ? 'text-success font-black' : 'text-muted-foreground'],
-                      ['مدة العقد', `${activeContract.duration_months ? toArabicNumbers(activeContract.duration_months) + "شهر" : 'غير محدد'}`, 'text-foreground'],
+                      ['مدة العقد', `${activeContract.duration_months ? toArabicNumbers(activeContract.duration_months) + " " + (activeContract.duration_months === 1 ? "شهر" : "أشهر") : 'غير محدد'}`, 'text-foreground'],
                     ].map(([k, v, cls]) => (
                       <div key={k} className="bg-muted/50 rounded-xl px-4 py-3 border border-border/60">
                         <p className="text-xs text-muted-foreground mb-1">{k}</p>

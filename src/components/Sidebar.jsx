@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, Users, FileText,
-  Bell, BarChart3, LogOut, Sun, Moon, Menu, X, Eye, Download
+  Bell, BarChart3, LogOut, Sun, Moon, Menu, X, Eye, Download, Wallet
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/stands', icon: Building2, label: 'اللوحات الإعلانية' },
   { to: '/clients', icon: Users, label: 'العملاء' },
   { to: '/contracts', icon: FileText, label: 'العقود' },
+  { to: '/collections', icon: Wallet, label: 'التحصيل' },
   { to: '/expiry-alerts', icon: Bell, label: 'تنبيهات الانتهاء' },
 
   { to: '/reports', icon: BarChart3, label: 'التقارير' },

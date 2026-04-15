@@ -402,7 +402,7 @@ export default function ContractDetail() {
 
   <h2>تفاصيل العقد</h2>
   <div class="grid">
-    <div class="field"><div class="label">نوع العقد</div><div class="value">${contract.is_open ? 'عقد مفتوح' : (contract.duration_months || '—') + ' شهر'}</div></div>
+    <div class="field"><div class="label">نوع العقد</div><div class="value">${contract.is_open ? 'عقد مفتوح' : (contract.duration_months || '—') + ' ' + (contract.duration_months === 1 ? 'شهر' : 'أشهر')}</div></div>
     <div class="field"><div class="label">نظام الدفع</div><div class="value">${paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency}</div></div>
     <div class="field"><div class="label">تاريخ البداية</div><div class="value">${formatDate(contract.start_date)}</div></div>
     <div class="field"><div class="label">قيمة العقد الإجمالية</div><div class="value">${contract.is_open ? '— (عقد مفتوح)' : formatCurrency(contract.total_value)}</div></div>
@@ -485,7 +485,7 @@ export default function ContractDetail() {
         <StatCard title="قيمة العقد" value={contract.is_open ? '—' : formatCurrency(contract.total_value)} icon={CreditCard} variant="default" />
         <StatCard 
           title="مدة العقد" 
-          value={contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} شهر`} 
+          value={contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} ${contract.duration_months === 1 ? 'شهر' : 'أشهر'}`} 
           icon={CreditCard} 
           variant="info" 
         />
@@ -493,7 +493,7 @@ export default function ContractDetail() {
           title="الفترة المنقضية" 
           value={
             <span>
-              {toArabicNumbers(elapsedMonths)} شهر
+              {toArabicNumbers(elapsedMonths)} {elapsedMonths === 1 ? 'شهر' : 'أشهر'}
               {extraDays > 0 && <span className="text-xs text-muted-foreground ms-1">و{toArabicNumbers(extraDays)} يوم</span>}
             </span>
           } 
@@ -520,7 +520,7 @@ export default function ContractDetail() {
               ['العنوان', contract.stands?.address],
               ['العميل', contract.clients?.name],
               ['الهاتف', contract.clients?.phone],
-              ['نوع العقد', contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} شهر`],
+              ['نوع العقد', contract.is_open ? 'مفتوح' : `${toArabicNumbers(contract.duration_months) || '—'} ${contract.duration_months === 1 ? 'شهر' : 'أشهر'}`],
               ['فترة الدفع', INTERVAL_LABELS[contract.payment_frequency]?.split('(')[0].trim() || paymentFrequencyLabels[contract.payment_frequency] || contract.payment_frequency],
               ['السعر الشهري', contract.monthly_rate ? formatCurrency(contract.monthly_rate) : '—'],
               ['قيمة الدفعة', contract.price_per_period ? formatCurrency(contract.price_per_period) : (contract.is_open ? formatCurrency(contract.monthly_rate * INTERVAL_MONTHS[contract.payment_frequency]) : '—')],

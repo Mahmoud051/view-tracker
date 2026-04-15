@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, FileText, UserPlus, X, ChevronDown, Calendar } from 'lucide-react'
+import { Plus, Search, FileText, UserPlus, X, ChevronDown, Calendar, Download } from 'lucide-react'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatCurrency, safeNum, todayStr, toLocalDateStr, addDays, computeContractStatus, cn, paymentIntervalMonths, getDurationCompatibilityError, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -22,7 +24,7 @@ const INTERVAL_LABELS = {
   monthly: 'شهري (كل شهر)',
   quarterly: 'ربع سنوي (كل 3 أشهر)',
   semi_annual: 'نصف سنوي (كل 6 أشهر)',
-  annual: 'سنوي (كل 12 شهر)',
+  annual: 'سنوي (كل 12 أشهر)',
 }
 
 const EMPTY_FORM = {
@@ -241,10 +243,13 @@ export default function Contracts() {
   }
 
   const filtered = (contracts || []).filter(c => {
-    const matchStatus = filter === 'all' || c.status === filter
+    const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+    const matchStatus = filter === 'all' || realStatus === filter
     const matchSearch = !search ||
       c.stands?.code?.toLowerCase().includes(search.toLowerCase()) ||
-      c.clients?.name?.toLowerCase().includes(search.toLowerCase())
+      c.stands?.address?.toLowerCase().includes(search.toLowerCase()) ||
+      c.clients?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      c.clients?.phone?.toLowerCase().includes(search.toLowerCase())
     return matchStatus && matchSearch
   })
 
@@ -377,6 +382,107 @@ export default function Contracts() {
     }
   }
 
+  async function exportToExcel() {
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('العقود')
+
+    // RTL support
+    worksheet.views = [{ rightToLeft: true }]
+    worksheet.properties.outlineLevelRow = 0
+
+    // Add title
+    worksheet.addRow(['العقود - تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG')])
+    worksheet.getRow(1).font = { bold: true, size: 14, name: 'Cairo' }
+    worksheet.getRow(1).alignment = { horizontal: 'center' }
+    worksheet.mergeCells('A1:K1')
+
+    // Add headers
+    const headers = ['اللوحة', 'الموقع', 'العميل', 'الهاتف', 'الحالة', 'البداية', 'النهاية', 'المدة', 'تكلفة الفترة', 'المدفوع', 'عليه / له']
+    const headerRow = worksheet.addRow(headers)
+    headerRow.font = { bold: true, name: 'Cairo' }
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E3A5F' }
+    }
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Cairo' }
+
+    // Add data
+    filtered.forEach(c => {
+      const paid = paymentsMap[c.id] || 0
+      const realStatus = computeContractStatus(c.start_date, c.end_date, c.status)
+
+      let elapsedCost = 0
+      let prepaid = 0
+      let owed = 0
+
+      if (c.start_date && realStatus !== 'upcoming') {
+        const INTERVAL_MONTHS_CALC = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+        const now = new Date()
+        const start = new Date(c.start_date)
+        const end = c.end_date ? new Date(c.end_date) : null
+        const nowCapped = end && now > end ? end : now
+        const paymentFreq = c.payment_frequency || 'monthly'
+        const monthlyRate = (c.is_open && c.monthly_rate) ? safeNum(c.monthly_rate) : (safeNum(c.total_value) / (parseInt(c.duration_months) || 1))
+        const intervalMonths = INTERVAL_MONTHS_CALC[paymentFreq] || 1
+        const periodRate = monthlyRate * intervalMonths
+
+        let periodsDue
+        if (c.is_open) {
+          const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+          const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+          periodsDue = Math.ceil(completeMonths / intervalMonths)
+        } else {
+          const totalPeriods = Math.ceil((parseInt(c.duration_months) || 1) / intervalMonths)
+          const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth())
+          const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths
+          periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods)
+        }
+        elapsedCost = periodsDue * periodRate
+        prepaid = Math.max(0, paid - elapsedCost)
+        owed = Math.max(0, elapsedCost - paid)
+      }
+
+      const statusLabels = {
+        active: 'نشط',
+        upcoming: 'قادم',
+        expired: 'منتهي',
+        terminated: 'مُنهى'
+      }
+
+      worksheet.addRow([
+        c.stands?.code || '',
+        c.stands?.address || '',
+        c.clients?.name || '',
+        c.clients?.phone || '',
+        statusLabels[realStatus] || realStatus,
+        formatDate(c.start_date),
+        c.is_open ? 'مفتوح' : formatDate(c.end_date),
+        c.is_open ? 'مفتوح' : `${c.duration_months} ${c.duration_months === 1 ? 'شهر' : 'أشهر'}`,
+        elapsedCost,
+        paid,
+        owed > 0 ? owed : prepaid > 0 ? prepaid : 0
+      ])
+    })
+
+    // Auto-width columns
+    worksheet.columns.forEach((column, i) => {
+      let maxLength = 0
+      column.eachCell({ includeEmpty: true }, cell => {
+        const length = cell.value ? String(cell.value).length : 10
+        if (length > maxLength) maxLength = length
+      })
+      column.width = Math.min(Math.max(maxLength + 2, 15), 40)
+    })
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    saveAs(blob, `العقود_${new Date().toISOString().split('T')[0]}.xlsx`)
+
+    toast({ title: 'تم التصدير', description: 'تم تصدير العقود إلى Excel بنجاح', variant: 'success' })
+  }
+
   if (loading) return <LoadingScreen />
 
   const statusTabs = [
@@ -396,6 +502,7 @@ export default function Contracts() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="العقود" description={`${toArabicNumbers(contracts.length)} عقد إجمالاً`}>
         <Button onClick={() => setDialogOpen(true)}><Plus className="w-4 h-4" /> عقد جديد</Button>
+        <Button variant="outline" onClick={exportToExcel}><Download className="w-4 h-4" /> تصدير Excel</Button>
       </PageHeader>
 
       {/* Filters */}
@@ -471,7 +578,13 @@ export default function Contracts() {
                     <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                       <TableCell>
                         <p className="font-semibold text-sm">{c.stands?.code}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[120px]">{c.stands?.address}</p>
+                        <div className="group relative inline-block">
+                          <p className="text-xs text-muted-foreground truncate max-w-[120px] cursor-help">{c.stands?.address}</p>
+                          <div className="absolute bg-secondary bottom-full right-0 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 border border-border">
+                            {c.stands?.address}
+                            <div className="absolute top-full right-4 -mt-px border-8 border-transparent border-t-popover"></div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <p className="font-medium text-sm">
@@ -481,7 +594,7 @@ export default function Contracts() {
                         </p>
                         <p className="text-xs text-muted-foreground">{c.clients?.phone}</p>
                       </TableCell>
-                      <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${toArabicNumbers(c.duration_months)} شهر`}</TableCell>
+                      <TableCell className="text-sm">{c.is_open ? 'مفتوح' : `${toArabicNumbers(c.duration_months)} ${c.duration_months === 1 ? 'شهر' : 'أشهر'}`}</TableCell>
                       <TableCell className="text-sm">{formatDate(c.start_date)}</TableCell>
                       <TableCell className="text-sm">
                         {c.is_open ? (
@@ -606,7 +719,7 @@ export default function Contracts() {
                 placeholder="سعر الشهر الواحد"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                مثال: 100 جنيه في الشهر × {form.duration_months || '?'} شهر = {form.total_value ? formatCurrency(parseFloat(form.total_value)).replace('جنيه', '').trim() + ' جنيه' : '?'}
+                مثال: 100 جنيه في الشهر × {form.duration_months || '?'} {form.duration_months === 1 ? 'شهر' : 'أشهر'} = {form.total_value ? formatCurrency(parseFloat(form.total_value)).replace('جنيه', '').trim() + ' جنيه' : '?'}
               </p>
             </FormField>
             {monthlyRate > 0 && form.duration_months > 0 && !form.is_open && (
@@ -616,7 +729,7 @@ export default function Contracts() {
                     {formatCurrency(perPeriodAmount)}
                   </span>
                   <span className="text-muted-foreground ms-2 text-xs">
-                    كل {intervalMonths} {intervalMonths === 1 ? 'شهر' : intervalMonths === 3 ? 'أشهر' : intervalMonths === 6 ? 'أشهر' : 'شهر'}
+                    كل {intervalMonths} {intervalMonths === 1 || intervalMonths === 12 ? 'شهر' : 'أشهر'}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -636,7 +749,7 @@ export default function Contracts() {
                     {formatCurrency(perPeriodAmount)}
                   </span>
                   <span className="text-muted-foreground ms-2 text-xs">
-                    كل {intervalMonths} {intervalMonths === 1 ? 'شهر' : intervalMonths === 3 ? 'أشهر' : intervalMonths === 6 ? 'أشهر' : 'شهر'}
+                    كل {intervalMonths} {intervalMonths === 1 || intervalMonths === 12 ? 'شهر' : 'أشهر'}
                   </span>
                 </div>
               </FormField>

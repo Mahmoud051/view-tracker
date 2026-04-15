@@ -507,7 +507,7 @@ export default function Reports() {
                           <TableCell className="font-semibold">{c.stands?.code}</TableCell>
                           <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate">{c.stands?.address || '—'}</TableCell>
                           <TableCell>{c.clients?.name}</TableCell>
-                          <TableCell className="text-sm">{c.duration_months ? `${c.duration_months} شهر` : '—'}</TableCell>
+                          <TableCell className="text-sm">{c.duration_months ? `${c.duration_months} ${c.duration_months === 1 ? 'شهر' : 'أشهر'}` : '—'}</TableCell>
                           <TableCell>{formatDate(c.start_date)}</TableCell>
                           <TableCell>{formatDate(c.end_date)}</TableCell>
                           <TableCell>{c.is_open ? '—' : formatCurrency(c.total_value)}</TableCell>

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { DayPicker } from 'react-day-picker'
 import { ar } from 'date-fns/locale'
 import { format } from 'date-fns'
-import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -105,7 +105,21 @@ function DateInput({ className, value, onChange, disabled, readOnly, placeholder
             </div>
 
             {/* Custom header with arrows and month name */}
-            <div className="flex items-center justify-center gap-3 px-4 pt-4">
+            <div className="flex items-center justify-center gap-2 px-4 pt-4">
+              {/* Year backward */}
+              <button
+                type="button"
+                onClick={() => {
+                  const prev = new Date(displayMonth)
+                  prev.setFullYear(prev.getFullYear() - 1)
+                  setDisplayMonth(prev)
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+
+              {/* Month backward */}
               <button
                 type="button"
                 onClick={() => {
@@ -122,6 +136,7 @@ function DateInput({ className, value, onChange, disabled, readOnly, placeholder
                 {monthLabel}
               </span>
 
+              {/* Month forward */}
               <button
                 type="button"
                 onClick={() => {
@@ -132,6 +147,19 @@ function DateInput({ className, value, onChange, disabled, readOnly, placeholder
                 className="w-9 h-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
               >
                 <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Year forward */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new Date(displayMonth)
+                  next.setFullYear(next.getFullYear() + 1)
+                  setDisplayMonth(next)
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              >
+                <ChevronsLeft className="w-4 h-4" />
               </button>
             </div>
 

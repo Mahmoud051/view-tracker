@@ -268,13 +268,19 @@ export default function ClientDetail() {
                       <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                         <TableCell>
                           <p className="font-medium">{c.stands?.code}</p>
-                          <p className="text-xs text-muted-foreground">{c.stands?.address?.slice(0,30)}</p>
+                             <div className="group relative inline-block">
+                          <p className="text-xs text-muted-foreground truncate max-w-[120px] cursor-help">{c.stands?.address}</p>
+                          <div className="absolute bg-secondary bottom-full right-0 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 border border-border">
+                            {c.stands?.address}
+                            <div className="absolute top-full right-4 -mt-px border-8 border-transparent border-t-popover"></div>
+                          </div>
+                        </div>
                         </TableCell>
                         <TableCell>
                           {c.is_open ? (
                             <span className="text-xs font-medium text-info">مفتوح</span>
                           ) : (
-                            <span>{toArabicNumbers(c.duration_months)} شهر</span>
+                            <span>{toArabicNumbers(c.duration_months)} {c.duration_months === 1 ? 'شهر' : 'أشهر'}</span>
                           )}
                         </TableCell>
                         <TableCell>{formatDate(c.start_date)}</TableCell>
