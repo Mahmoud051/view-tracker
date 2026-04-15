@@ -37,6 +37,7 @@ export default function Stands() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("az");
   const [showInactive, setShowInactive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(buildEmptyForm());
@@ -77,6 +78,56 @@ export default function Stands() {
     const standStatus = rentedIds.has(s.id) ? "rented" : "available";
     const matchStatus = statusFilter === "all" || standStatus === statusFilter;
     return matchSearch && matchStatus;
+  }).sort((a, b) => {
+    if (sortBy === "az") return a.code.localeCompare(b.code, 'ar');
+    if (sortBy === "unpaid") {
+      const aContract = contracts.find((c) => c.stand_id === a.id);
+      const bContract = contracts.find((c) => c.stand_id === b.id);
+      const aOwed = aContract ? Math.max(0, (() => {
+        if (!aContract.start_date) return 0;
+        const now = new Date();
+        const start = new Date(aContract.start_date);
+        const end = aContract.end_date ? new Date(aContract.end_date) : null;
+        const nowCapped = end && now > end ? end : now;
+        const paymentFreq = aContract.payment_frequency || "monthly";
+        const intervalMonths = paymentIntervalMonths[paymentFreq] || 1;
+        const monthlyRate = safeNum(aContract.monthly_rate) || safeNum(aContract.total_value) / (parseInt(aContract.duration_months) || 1);
+        const periodRate = monthlyRate * intervalMonths;
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth());
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths;
+        let periodsDue;
+        if (aContract.is_open) {
+          periodsDue = Math.ceil(completeMonths / intervalMonths);
+        } else {
+          const totalPeriods = Math.ceil((parseInt(aContract.duration_months) || 1) / intervalMonths);
+          periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods);
+        }
+        return periodsDue * periodRate - (paymentsMap[aContract.id] || 0);
+      })()) : 0;
+      const bOwed = bContract ? Math.max(0, (() => {
+        if (!bContract.start_date) return 0;
+        const now = new Date();
+        const start = new Date(bContract.start_date);
+        const end = bContract.end_date ? new Date(bContract.end_date) : null;
+        const nowCapped = end && now > end ? end : now;
+        const paymentFreq = bContract.payment_frequency || "monthly";
+        const intervalMonths = paymentIntervalMonths[paymentFreq] || 1;
+        const monthlyRate = safeNum(bContract.monthly_rate) || safeNum(bContract.total_value) / (parseInt(bContract.duration_months) || 1);
+        const periodRate = monthlyRate * intervalMonths;
+        const rawMonths = (nowCapped.getFullYear() - start.getFullYear()) * 12 + (nowCapped.getMonth() - start.getMonth());
+        const completeMonths = nowCapped.getDate() >= start.getDate() ? rawMonths + 1 : rawMonths;
+        let periodsDue;
+        if (bContract.is_open) {
+          periodsDue = Math.ceil(completeMonths / intervalMonths);
+        } else {
+          const totalPeriods = Math.ceil((parseInt(bContract.duration_months) || 1) / intervalMonths);
+          periodsDue = Math.min(Math.ceil(completeMonths / intervalMonths), totalPeriods);
+        }
+        return periodsDue * periodRate - (paymentsMap[bContract.id] || 0);
+      })()) : 0;
+      return bOwed - aOwed;
+    }
+    return 0;
   });
 
   function updateMeasurement(field, value) {
@@ -171,6 +222,15 @@ export default function Stands() {
             <SelectItem value="rented">مؤجر</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-44">
+            <SelectValue placeholder="ترتيب" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="az">أ-ي</SelectItem>
+            <SelectItem value="unpaid">الأكثر مديونية</SelectItem>
+          </SelectContent>
+        </Select>
         <Button size="sm" variant={showInactive ? "default" : "outline"} onClick={() => setShowInactive((v) => !v)} className="gap-1.5">
           {showInactive ? "إخفاء المتوقفة" : "إظهار المتوقفة"}
         </Button>
@@ -234,7 +294,7 @@ export default function Stands() {
                 {/* Info */}
                 <div className={cn("p-4 space-y-2", isInactive && "opacity-60")}>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-foreground">{stand.code}</h3>
+                    <h4 className="font-bold text-foreground">{stand.code}</h4>
                     <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                       <Ruler className="w-3 h-3" />
                       {(stand.width * stand.height).toFixed(0)} م²
@@ -247,7 +307,7 @@ export default function Stands() {
                   <div className="flex items-center gap-1.5">
                     <Wallet className={cn("w-3.5 h-3.5 flex-shrink-0", stand.export_price ? "text-success" : "text-muted-foreground")} />
 
-                    <p className={cn("text-xs font-medium", stand.export_price ? "text-success" : "text-muted-foreground")}>سعر الإيجار: {stand.export_price ? formatCurrency(stand.export_price) : "--"}</p>
+                    <p className={cn("text-xs font-medium", stand.export_price ? "text-success" : "text-muted-foreground")}>سعر الإيجار: {stand.export_price ? formatCurrency(stand.export_price) : "—"}</p>
                   </div>
 
                   {(() => {
@@ -305,7 +365,7 @@ export default function Stands() {
                         </div>
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                           <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                          <p className="text-xs">{isTerminated || isExpired ? `منتهي` : contract ? `ينتهي : ${formatDate(contract.end_date)}` : <>&nbsp;</>}</p>
+                          <p className="text-xs">{isTerminated || isExpired ? `منتهي` : contract ? `ينتهي : ${formatDate(contract.end_date)}` : "لم يؤجر من قبل"}</p>
                           {!isTerminated && !isExpired && daysLeft !== null && daysLeft > 0 && (
                             <span className={cn("text-xs font-medium px-1.5 py-0.5 rounded-full", daysLeft <= 30 ? "bg-destructive/15 text-destructive" : daysLeft <= 90 ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>
                               {daysLeft} يوم
@@ -315,7 +375,7 @@ export default function Stands() {
                         <div className="flex items-center gap-1.5">
                           <Wallet className={cn("w-3.5 h-3.5 flex-shrink-0", owed > 0 ? "text-destructive" : "text-muted-foreground")} />
 
-                          <p className={cn("text-xs font-medium", owed > 0 ? "text-destructive" : "text-muted-foreground")}>عليه : {owed > 0 ? formatCurrency(owed) : "—"}</p>
+                          <p className={cn("text-xs font-medium", owed > 0 ? "text-destructive" : "text-muted-foreground")}>{owed > 0 ? "عليه : " + formatCurrency(owed) : "—"}</p>
                         </div>
                       </>
                     );
