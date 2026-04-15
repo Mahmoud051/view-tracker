@@ -271,7 +271,7 @@ export default function Stands() {
             return (
               <button key={stand.id} onClick={() => navigate(`/stands/${stand.id}`)} className="text-start bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 card-hover group">
                 {/* Photo */}
-                <div className="h-36 bg-muted relative overflow-hidden">
+                <div className="h-40 bg-muted relative overflow-hidden">
                   {stand.photo_url ? (
                     <img
                       src={stand.photo_url}
