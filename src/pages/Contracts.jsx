@@ -191,6 +191,7 @@ export default function Contracts() {
   const [paymentsMap, setPaymentsMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('stand')
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
@@ -251,6 +252,10 @@ export default function Contracts() {
       c.clients?.name?.toLowerCase().includes(search.toLowerCase()) ||
       c.clients?.phone?.toLowerCase().includes(search.toLowerCase())
     return matchStatus && matchSearch
+  }).sort((a, b) => {
+    if (sortBy === 'stand') return (a.stands?.code || '').localeCompare(b.stands?.code || '', 'ar');
+    if (sortBy === 'client') return (a.clients?.name || '').localeCompare(b.clients?.name || '', 'ar');
+    return 0;
   })
 
   function computeValues(startDate, durationMonths, monthlyRate, interval, isOpen) {
@@ -522,6 +527,15 @@ export default function Contracts() {
           <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9 h-8 text-xs" />
         </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-40 h-8 text-xs">
+            <SelectValue placeholder="ترتيب" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="stand">ترتيب باللوحة</SelectItem>
+            <SelectItem value="client">ترتيب بالعميل</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
