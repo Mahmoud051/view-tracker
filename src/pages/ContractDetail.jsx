@@ -478,6 +478,21 @@ export default function ContractDetail() {
             <FileDown className="w-4 h-4" /> طباعة / PDF
           </Button>
         </div>
+        {/* Navigation Links */}
+        <div className="flex items-center gap-4 pt-3 border-t border-border mt-3">
+          <button
+            onClick={() => navigate(`/stands/${contract.stand_id}`)}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+          >
+            الذهاب إلى اللوحة <ArrowRight className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => navigate(`/clients/${contract.client_id}`)}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+          >
+            الذهاب إلى العميل <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
