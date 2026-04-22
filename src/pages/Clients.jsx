@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Users, Phone, FileText, Building2, Calendar } from 'lucide-react'
+import { Plus, Search, Users, Phone, FileText, Building2, Calendar, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, safeNum, computeContractStatus, toArabicNumbers } from '@/lib/utils'
+import { formatCurrency, formatDate, safeNum, computeContractStatus, toArabicNumbers, exportExcelFile } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ export default function Clients() {
   const [clients, setClients] = useState([])
   const [contractsMap, setContractsMap] = useState({})
   const [paymentsMap, setPaymentsMap] = useState({})
+  const [lastPaymentDatesMap, setLastPaymentDatesMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -30,7 +31,7 @@ export default function Clients() {
     const [{ data: c }, { data: contracts }, { data: payments }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('contracts').select('id, client_id, status, total_value, start_date, end_date, duration_months, payment_frequency, monthly_rate, is_open, stands(code, address)'),
-      supabase.from('payments').select('id, contract_id, amount'),
+      supabase.from('payments').select('id, contract_id, amount, payment_date').order('payment_date', { ascending: false }),
     ])
     setClients(c || [])
 
@@ -48,6 +49,17 @@ export default function Clients() {
       pm[p.contract_id] = (pm[p.contract_id] || 0) + safeNum(p.amount)
     })
     setPaymentsMap(pm)
+
+    // Build last payment date per client (from all their contracts)
+    const lpdMap = {}
+    ;(payments || []).forEach(p => {
+      const contract = (contracts || []).find(ct => ct.id === p.contract_id)
+      if (!contract) return
+      if (!lpdMap[contract.client_id] || (p.payment_date && p.payment_date > lpdMap[contract.client_id])) {
+        lpdMap[contract.client_id] = p.payment_date
+      }
+    })
+    setLastPaymentDatesMap(lpdMap)
     setLoading(false)
   }
 
@@ -142,6 +154,21 @@ export default function Clients() {
     return { active: active.length, total: cts.length, totalElapsedCost, totalPaid, owed, prepaid, periodDue, nearestContract }
   }
 
+  async function handleExportClients() {
+    const rows = filtered.map(client => {
+      const stats = clientStats(client.id)
+      const amount = stats.owed > 0 ? stats.owed : stats.prepaid > 0 ? -stats.prepaid : 0
+      return {
+        'اسم العميل': client.name,
+        'رقم الهاتف': client.phone || '',
+        'عدد اللوحات النشطة': stats.active,
+        'المبلغ': amount,
+        'آخر دفعة': lastPaymentDatesMap[client.id] || '',
+      }
+    })
+    await exportExcelFile('العملاء.xlsx', [{ name: 'العملاء', rows }])
+  }
+
   async function handleSave() {
     const errs = {}
     if (!form.name.trim()) errs.name = 'اسم العميل مطلوب'
@@ -164,6 +191,9 @@ export default function Clients() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="العملاء" description={`${toArabicNumbers(clients.length)} عميل`}>
+        <Button variant="outline" onClick={handleExportClients} disabled={filtered.length === 0}>
+          <Download className="w-4 h-4" /> تصدير Excel
+        </Button>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4" /> إضافة عميل
         </Button>

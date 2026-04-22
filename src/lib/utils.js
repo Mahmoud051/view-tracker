@@ -263,18 +263,18 @@ function setWorksheetColumns(worksheet, rows) {
   worksheet.columns = headers.map(header => ({
     header,
     key: header,
-    width: Math.max(String(header).length + 4, 16),
+    width: String(header).length + 2,
   }))
 }
 
 function autosizeWorksheet(worksheet) {
   worksheet.columns?.forEach(column => {
-    let maxLength = 12
+    let maxLength = 10
     column.eachCell({ includeEmpty: true }, cell => {
       const value = cell.value == null ? '' : String(cell.value)
       maxLength = Math.max(maxLength, value.length + 2)
     })
-    column.width = Math.min(maxLength, 40)
+    column.width = maxLength
   })
 }
 

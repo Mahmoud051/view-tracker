@@ -274,12 +274,13 @@ export default function StandsExport() {
     ${pageStands.map(stand => {
       const statusInfo = getStandStatus(stand)
       const isRented = statusInfo.status !== 'available'
+      const sidesLabel = stand.sides === 2 ? 'وجهين' : 'وجه'
       return `
     <div class="card ${isRented ? 'rented' : 'available'}">
       ${stand.photo_url ? `<div class="card-image"><img src="${stand.photo_url}" alt="${stand.code}" onerror="this.parentElement.innerHTML='<span style=\\'color:#94a3b8;font-size:18px;text-align:center;padding:20px;\\'>لا توجد صورة لهذه اللوحة بعد</span>'"/></div>` : `<div class="card-image"><span style="color:#94a3b8;font-size:18px;text-align:center;padding:20px;">لا توجد صورة لهذه اللوحة بعد</span></div>`}
       <div class="card-content">
         <div class="card-code">${stand.code || '—'}</div>
-        ${stand.width && stand.height ? `<div class="card-dimensions">${toArabicNumbers(stand.width)}م × ${toArabicNumbers(stand.height)}م</div>` : ''}
+        ${stand.width && stand.height ? `<div class="card-dimensions">${toArabicNumbers(stand.width)}م × ${toArabicNumbers(stand.height)}م — ${sidesLabel}</div>` : ''}
         ${stand.address ? `<div class="card-address">${stand.address}</div>` : ''}
         <div class="card-status ${isRented ? 'rented' : 'available'}">${statusInfo.labelAr}</div>
         ${includePrice && stand.export_price ? `<div class="card-price">${toArabicNumbers(Number(stand.export_price).toLocaleString())} جنيه</div>` : ''}
@@ -422,7 +423,7 @@ export default function StandsExport() {
                       </div>
                       {stand.width && stand.height && (
                         <div className="text-sm text-muted-foreground">
-                          الأبعاد: {toArabicNumbers(stand.width)}م × {toArabicNumbers(stand.height)}م
+                          الأبعاد: {toArabicNumbers(stand.width)}م × {toArabicNumbers(stand.height)}م — {stand.sides === 2 ? 'وجهين' : 'وجه'}
                         </div>
                       )}
                       {showPrice && stand.export_price && (
