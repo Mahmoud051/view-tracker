@@ -339,10 +339,15 @@ export default function StandDetail() {
       <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm">
         {stand.photo_url ? (
           <div
-            className="h-44 sm:h-52 bg-cover bg-center relative cursor-pointer group"
-            style={{ backgroundImage: `url(${stand.photo_url})` }}
+            className="h-44 sm:h-52 relative cursor-pointer group overflow-hidden"
             onClick={() => setImageModalOpen(true)}
           >
+            <img
+              src={stand.photo_url}
+              alt={stand.code}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { e.target.style.display = 'none' }}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20" />
             <div className="absolute top-3 end-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg p-2">
               <Maximize2 className="w-5 h-5 text-white" />
