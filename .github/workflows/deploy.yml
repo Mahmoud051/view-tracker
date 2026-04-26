@@ -3,7 +3,7 @@ name: Deploy React App to GitHub Pages
 on:
   push:
     branches:
-      - master # or master
+      - master
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
 
       - name: Install deps
         run: npm install
@@ -35,13 +35,16 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist   # or ./dist if using Vite
+          path: ./dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
+    permissions:
+      pages: write
+      id-token: write
+
     steps:
       - name: Deploy to Pages
         uses: actions/deploy-pages@v4
-        
