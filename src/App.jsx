@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -18,7 +18,7 @@ import Collections from '@/pages/Collections'
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+    <HashRouter future={{ v7_relativeSplatPath: true }}>
       <ThemeProvider>
         <AuthProvider>
           <ToastProvider>
@@ -42,6 +42,6 @@ export default function App() {
           </ToastProvider>
         </AuthProvider>
       </ThemeProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
