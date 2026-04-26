@@ -32,7 +32,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build   # or ./dist if using Vite
+          path: ./dist   # or ./dist if using Vite
 
   deploy:
     needs: build
