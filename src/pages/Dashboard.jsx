@@ -290,7 +290,7 @@ export default function Dashboard() {
           {govAlerts.length > 0 && (
             <Card className="border-warning/40 bg-warning/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-warning flex flex-reverse items-center gap-2 text-sm">
+                <CardTitle className="text-warning flex items-center gap-2 text-sm">
                   <Bell className="w-4 h-4" />
                   تراخيص حكومية تنتهي قريباً ({govAlerts.length})
                 </CardTitle>
@@ -322,7 +322,7 @@ export default function Dashboard() {
           {contractAlerts.length > 0 && (
             <Card className="border-destructive/40 bg-destructive/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-destructive flex flex-reverse items-center gap-2 text-sm">
+                <CardTitle className="text-destructive flex items-center gap-2 text-sm">
                   <AlertCircle className="w-4 h-4" />
                   عقود تنتهي قريباً ({contractAlerts.length})
                 </CardTitle>
@@ -356,7 +356,7 @@ export default function Dashboard() {
       {/* Section 3: Revenue Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex flex-reverse items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base">
             <TrendingUp className="w-5 h-5 text-primary" />
             الإيرادات — آخر 12 شهر
           </CardTitle>
@@ -383,7 +383,7 @@ export default function Dashboard() {
         {/* Stand status */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <PieChartIcon className="w-4 h-4 text-primary" />
               حالة اللوحات
             </CardTitle>
@@ -410,7 +410,7 @@ export default function Dashboard() {
         {/* Contract status */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <FileText className="w-4 h-4 text-primary" />
               حالة العقود
             </CardTitle>
@@ -437,7 +437,7 @@ export default function Dashboard() {
         {/* Recent payments */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex flex-reverse items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <CreditCard className="w-4 h-4 text-primary" />
               آخر المدفوعات
             </CardTitle>

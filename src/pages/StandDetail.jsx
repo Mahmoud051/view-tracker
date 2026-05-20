@@ -169,7 +169,8 @@ export default function StandDetail() {
       }
       if (photoFile) {
         const fileName = `${Date.now()}-${photoFile.name}`
-        const { data: up } = await supabase.storage.from('stand-photos').upload(fileName, photoFile)
+        const { data: up, error: upErr } = await supabase.storage.from('stand-photos').upload(fileName, photoFile)
+        if (upErr) throw new Error(`فشل رفع الصورة: ${upErr.message}`)
         if (up) {
           const { data: { publicUrl } } = supabase.storage.from('stand-photos').getPublicUrl(fileName)
           updates.photo_url = publicUrl
@@ -187,7 +188,7 @@ export default function StandDetail() {
   async function saveGov() {
     setSaving(true)
     try {
-      const govStatus = govForm.gov_rental_end ? computeGovStatus(govForm.gov_rental_end) : 'active'
+      const govStatus = govForm.gov_rental_end ? computeGovStatus(govForm.gov_rental_end, govForm.gov_license_number) : 'active'
       const { error } = await supabase.from('stands').update({
         gov_license_number: govForm.gov_license_number || null,
         gov_rental_start: govForm.gov_rental_start || null,
@@ -272,15 +273,25 @@ export default function StandDetail() {
   }
 
   async function deleteMaint(mId) {
-    await supabase.from('maintenance_records').delete().eq('id', mId)
-    toast({ title: 'تم الحذف', variant: 'success' })
+    try {
+      const { error } = await supabase.from('maintenance_records').delete().eq('id', mId)
+      if (error) throw error
+      toast({ title: 'تم الحذف', variant: 'success' })
+      fetchAll()
+    } catch (e) {
+      toast({ title: 'خطأ', description: e.message, variant: 'error' })
+    }
     setDeleteConfirm(null)
-    fetchAll()
   }
 
   async function toggleMaintPaid(m) {
-    await supabase.from('maintenance_records').update({ is_paid: !m.is_paid }).eq('id', m.id)
-    fetchAll()
+    try {
+      const { error } = await supabase.from('maintenance_records').update({ is_paid: !m.is_paid }).eq('id', m.id)
+      if (error) throw error
+      fetchAll()
+    } catch (e) {
+      toast({ title: 'خطأ', description: e.message, variant: 'error' })
+    }
   }
 
   async function toggleStandActive() {
@@ -328,7 +339,7 @@ export default function StandDetail() {
   if (loading) return <LoadingScreen />
   if (!stand) return <div className="p-8 text-center text-muted-foreground">اللوحة غير موجودة</div>
 
-  const govStatus = computeGovStatus(stand.gov_rental_end)
+  const govStatus = computeGovStatus(stand.gov_rental_end, stand.gov_license_number)
   const isRented = !!activeContract
   const isStandActive = stand.is_active !== false
 
@@ -440,7 +451,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Building2 className="w-4 h-4 text-primary" />
                 </div>
@@ -526,7 +537,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden border-primary/20">
             <div className="h-px bg-gradient-to-r from-primary/40 via-primary/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-primary" />
                 </div>
@@ -560,7 +571,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-warning/40 via-warning/10 to-transparent" />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-warning" />
                 </div>
@@ -611,7 +622,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
                   <History className="w-4 h-4 text-info" />
                 </div>
@@ -671,7 +682,7 @@ export default function StandDetail() {
               <Card className="overflow-hidden">
                 <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
                 <CardHeader className="pb-2">
-                  <div className="flex flex-reverse items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                       <FileText className="w-4 h-4 text-success" />
                     </div>
@@ -717,7 +728,7 @@ export default function StandDetail() {
             <Card className="overflow-hidden">
               <div className="h-px bg-gradient-to-r from-info/40 via-info/10 to-transparent" />
               <CardHeader className="pb-2">
-                <div className="flex flex-reverse items-center gap-2">
+                <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
                     <Clock className="w-4 h-4 text-info" />
                   </div>
@@ -776,7 +787,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-muted-foreground/30 via-muted-foreground/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                   <History className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -911,7 +922,7 @@ export default function StandDetail() {
           <Card className="overflow-hidden">
             <div className="h-px bg-gradient-to-r from-success/40 via-success/10 to-transparent" />
             <CardHeader className="pb-2">
-              <div className="flex flex-reverse items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-success" />
                 </div>

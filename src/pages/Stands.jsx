@@ -161,14 +161,15 @@ export default function Stands() {
       if (photoFile) {
         const fileName = `${Date.now()}-${photoFile.name}`;
         const { data: uploadData, error: upErr } = await supabase.storage.from("stand-photos").upload(fileName, photoFile);
-        if (!upErr && uploadData) {
+        if (upErr) throw new Error(`فشل رفع الصورة: ${upErr.message}`);
+        if (uploadData) {
           const {
             data: { publicUrl },
           } = supabase.storage.from("stand-photos").getPublicUrl(fileName);
           photo_url = publicUrl;
         }
       }
-      const govStatus = form.gov_rental_end ? computeGovStatus(form.gov_rental_end) : "active";
+      const govStatus = form.gov_rental_end ? computeGovStatus(form.gov_rental_end, form.gov_license_number) : "active";
       const { error } = await supabase.from("stands").insert([
         {
           code: form.code.trim(),
@@ -266,7 +267,7 @@ export default function Stands() {
         <div className={cn("grid gap-4", gridCols === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")}>
           {filtered.map((stand) => {
             const isRented = rentedIds.has(stand.id) || contracts.some((c) => c.stand_id === stand.id && c.status === "upcoming");
-            const govSt = computeGovStatus(stand.gov_rental_end);
+            const govSt = computeGovStatus(stand.gov_rental_end, stand.gov_license_number);
             const isInactive = stand.is_active === false;
             return (
               <button key={stand.id} onClick={() => navigate(`/stands/${stand.id}`)} className="text-start bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 card-hover group">

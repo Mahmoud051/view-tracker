@@ -48,7 +48,9 @@ export function daysRemaining(dateStr) {
 }
 
 // Compute government permit status based on end date
-export function computeGovStatus(govRentalEnd) {
+export function computeGovStatus(govRentalEnd, govLicenseNumber = null) {
+  // If no license number and no end date, stand is not licensed
+  if (!govRentalEnd && !govLicenseNumber) return null
   if (!govRentalEnd) return 'active'
   const days = daysRemaining(govRentalEnd)
   if (days === null) return 'active'
