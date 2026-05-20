@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileDown, Building2, MapPin, Eye, EyeOff, Download, Image as ImageIcon, ImageOff } from 'lucide-react'
+import { FileDown, Building2, MapPin, Eye, EyeOff, Download, Image as ImageIcon, ImageOff, Loader2, ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, safeNum, cn, computeContractStatus, toArabicNumbers } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -9,9 +9,11 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { PageHeader, LoadingScreen } from '@/components/ui/shared'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 // Helper function to check if text contains Arabic characters
-const hasArabic = (text) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text)
+const hasArabic = (text) => /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/.test(text)
 
 export default function StandsExport() {
   const navigate = useNavigate()
@@ -21,6 +23,9 @@ export default function StandsExport() {
   const [showPrice, setShowPrice] = useState(true)
   const [contractsMap, setContractsMap] = useState({})
   const [sortBy, setSortBy] = useState('az')
+  const [exportLoading, setExportLoading] = useState(false)
+  const [openExportAll, setOpenExportAll] = useState(false)
+  const [openExportAvailable, setOpenExportAvailable] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -37,7 +42,7 @@ export default function StandsExport() {
       if (contractsRes.error) throw contractsRes.error
 
       setStands(standsRes.data || [])
-      
+
       // Map stands to their active contracts
       const cMap = {}
       contractsRes.data?.forEach(c => {
@@ -66,14 +71,14 @@ export default function StandsExport() {
     if (contract.is_open) {
       return { status: 'rented_open', label: 'Rented - Open Contract', color: '#f59e0b', labelAr: 'مؤجر - عقد مفتوح' } // amber
     }
-    
+
     if (contractStatus === 'expired') {
       return { status: 'available', label: 'Available', color: '#10b981', labelAr: 'متاح' }
     }
 
     const endDate = contract.end_date ? new Date(contract.end_date) : null
     const daysRemaining = endDate ? Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)) : null
-    
+
     return {
       status: 'rented_closed',
       label: daysRemaining !== null ? `Rented - ${daysRemaining} days left` : 'Rented - Open End',
@@ -96,28 +101,41 @@ export default function StandsExport() {
     return 0;
   })
 
-  const exportPDF = async (includePrice = true) => {
-    // Filter stands based on price inclusion
-    const filteredStands = sortedStands
+  const exportPDF = async ({ includePrice = true, onlyAvailable = false } = {}) => {
+    let exportStands = sortedStands
+    if (onlyAvailable) {
+      exportStands = sortedStands.filter(stand => getStandStatus(stand).status === 'available')
+    }
 
-    // Preload all images to ensure they're loaded before printing
-    const imageLoadPromises = filteredStands
-      .filter(stand => stand.photo_url)
-      .map(stand => {
-        return new Promise((resolve) => {
-          const img = new Image()
-          img.onload = () => resolve(true)
-          img.onerror = () => resolve(false)
-          img.src = stand.photo_url
-        })
+    if (exportStands.length === 0) {
+      toast({
+        title: 'لا توجد لوحات',
+        description: onlyAvailable ? 'لا توجد لوحات متاحة للتصدير' : 'لا توجد لوحات للتصدير',
+        variant: 'warning'
       })
+      return
+    }
 
-    // Wait for all images to load (with 10 second timeout)
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 10000))
-    await Promise.race([Promise.all(imageLoadPromises), timeoutPromise])
+    setExportLoading(true)
+    try {
+      // Preload all images to ensure they're loaded before printing
+      const imageLoadPromises = exportStands
+        .filter(stand => stand.photo_url)
+        .map(stand => {
+          return new Promise((resolve) => {
+            const img = new Image()
+            img.onload = () => resolve(true)
+            img.onerror = () => resolve(false)
+            img.src = stand.photo_url
+          })
+        })
 
-    // Build HTML for print
-    const html = `
+      // Wait for all images to load (with 10 second timeout)
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 10000))
+      await Promise.race([Promise.all(imageLoadPromises), timeoutPromise])
+
+      // Build HTML for print
+      const html = `
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -126,12 +144,12 @@ export default function StandsExport() {
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: 'Cairo', Arial, sans-serif; 
-      direction: rtl; 
-      color: #1e293b; 
-      background: #fff; 
-      padding: 5px; 
+    body {
+      font-family: 'Cairo', Arial, sans-serif;
+      direction: rtl;
+      color: #1e293b;
+      background: #fff;
+      padding: 5px;
     }
     .header {
       text-align: center;
@@ -239,13 +257,13 @@ export default function StandsExport() {
       font-weight: 700;
       color: #16a34a;
     }
-    .footer { 
-      margin-top: 40px; 
-      padding-top: 20px; 
-      border-top: 1px solid #e2e8f0; 
-      text-align: center; 
-      font-size: 12px; 
-      color: #94a3b8; 
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
     }
     @media print {
       .page { page-break-after: always; }
@@ -261,14 +279,14 @@ export default function StandsExport() {
 <body>
   <div class="header">
     <div class="company">ڤيو</div>
-    <div class="subtitle">${includePrice ? 'نظرة عامة على اللوحات' : 'اللوحات المتاحة للإيجار'} — الإجمالي: ${toArabicNumbers(filteredStands.length)} لوحة — تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}</div>
+    <div class="subtitle">${includePrice ? 'نظرة عامة على اللوحات' : 'اللوحات المتاحة للإيجار'} — الإجمالي: ${toArabicNumbers(exportStands.length)} لوحة — تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}</div>
   </div>
 
   ${(() => {
     const pages = [];
     let isFirstPage = true;
-    for (let i = 0; i < filteredStands.length; i += 2) {
-      const pageStands = filteredStands.slice(i, i + 2);
+    for (let i = 0; i < exportStands.length; i += 2) {
+      const pageStands = exportStands.slice(i, i + 2);
       pages.push(`
   <div class="page${isFirstPage ? ' first-page' : ''}">
     ${pageStands.map(stand => {
@@ -299,20 +317,38 @@ export default function StandsExport() {
 </body>
 </html>`
 
-    const win = window.open('', '_blank')
-    win.document.write(html)
-    win.document.close()
-    
-    // Wait a bit for images to render in the new window before triggering print
-    setTimeout(() => {
-      win.print()
-    }, 1000)
-    
-    toast({
-      title: 'تم فتح نافذة الطباعة',
-      description: 'اختر "Save as PDF" من خيارات الطابعة لحفظ الملف',
-      variant: 'success'
-    })
+      const win = window.open('', '_blank')
+      if (!win) {
+        toast({
+          title: 'تعذر فتح نافذة جديدة',
+          description: 'يرجى السماح بالنوافذ المنبثقة في المتصفح ثم المحاولة مرة أخرى',
+          variant: 'warning'
+        })
+        return
+      }
+      win.document.write(html)
+      win.document.close()
+
+      // Wait a bit for images to render in the new window before triggering print
+      setTimeout(() => {
+        win.print()
+      }, 1000)
+
+      toast({
+        title: 'تم فتح نافذة الطباعة',
+        description: 'اختر "Save as PDF" من خيارات الطابعة لحفظ الملف',
+        variant: 'success'
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تصدير اللوحات',
+        variant: 'error'
+      })
+    } finally {
+      setExportLoading(false)
+    }
   }
 
   if (loading) return <LoadingScreen />
@@ -332,21 +368,78 @@ export default function StandsExport() {
             <SelectItem value="status">حسب الحالة</SelectItem>
           </SelectContent>
         </Select>
-        <Button
-          variant="outline"
-          onClick={() => exportPDF(true)}
-          className="gap-2"
-        >
-          <Eye className="w-4 h-4" />
-          تصدير للعملاء (مع السعر)
-        </Button>
-        <Button
-          onClick={() => exportPDF(false)}
-          className="gap-2"
-        >
-          <FileDown className="w-4 h-4" />
-          تصدير داخلي (بدون سعر)
-        </Button>
+
+        <Popover open={openExportAll} onOpenChange={setOpenExportAll}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              تصدير الكل
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="end">
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setOpenExportAll(false)
+                  exportPDF({ includePrice: true, onlyAvailable: false })
+                }}
+              >
+                <Eye className="w-4 h-4" />
+                مع السعر
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setOpenExportAll(false)
+                  exportPDF({ includePrice: false, onlyAvailable: false })
+                }}
+              >
+                <EyeOff className="w-4 h-4" />
+                بدون سعر
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={openExportAvailable} onOpenChange={setOpenExportAvailable}>
+          <PopoverTrigger asChild>
+            <Button className="gap-2">
+              <FileDown className="w-4 h-4" />
+              تصدير المتاح فقط
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="end">
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setOpenExportAvailable(false)
+                  exportPDF({ includePrice: true, onlyAvailable: true })
+                }}
+              >
+                <Eye className="w-4 h-4" />
+                مع السعر
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setOpenExportAvailable(false)
+                  exportPDF({ includePrice: false, onlyAvailable: true })
+                }}
+              >
+                <EyeOff className="w-4 h-4" />
+                بدون سعر
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </PageHeader>
 
 
@@ -382,21 +475,21 @@ export default function StandsExport() {
               const isRented = statusInfo.status !== 'available'
 
               return (
-                <Card 
-                  key={stand.id} 
+                <Card
+                  key={stand.id}
                   className={cn(
                     'border-2 transition-all',
-                    isRented 
-                      ? 'border-destructive/30 bg-destructive/5' 
+                    isRented
+                      ? 'border-destructive/30 bg-destructive/5'
                       : 'border-success/30 bg-success/5'
                   )}
                 >
                   <CardContent className="p-4">
                     {/* Status indicator */}
                     <div className="flex items-center justify-between mb-3">
-                      <Badge 
+                      <Badge
                         className="text-xs"
-                        style={{ 
+                        style={{
                           backgroundColor: statusInfo.color + '20',
                           color: statusInfo.color,
                           borderColor: statusInfo.color
@@ -442,6 +535,23 @@ export default function StandsExport() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Loading Dialog */}
+      <Dialog open={exportLoading} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-[325px]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+        >
+          <DialogTitle className="sr-only">جاري التصدير</DialogTitle>
+          <DialogDescription className="sr-only">يتم الآن إعداد ملف PDF للتصدير</DialogDescription>
+          <div className="flex flex-col items-center justify-center gap-4 py-8">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-lg font-semibold">جاري إعداد التصدير...</p>
+            <p className="text-sm text-muted-foreground">قد يستغرق هذا بضع ثوانٍ</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
